@@ -54,7 +54,7 @@ logger.addHandler(ch)
 logger.setLevel(conf.log_level)
 
 
-def train(train_triples, train_pos1, train_pos2, train_y, conf, save_path):
+def train(train_x, train_y, conf, save_path):
     with tf.Session() as sess:
         initializer = tf.contrib.layers.xavier_initializer()
         with tf.variable_scope("model", reuse=None, initializer=initializer):
@@ -64,7 +64,7 @@ def train(train_triples, train_pos1, train_pos2, train_y, conf, save_path):
             else:
                 nre = model.NRE(conf)
 
-            num_triples = len(train_triples)
+            num_triples = len(train_x)
             global_step = tf.Variable(0, name="global_step", trainable=False)
             optimizer = tf.train.AdamOptimizer(learning_rate=conf.learning_rate, beta1=conf.beta1, beta2=conf.beta2,
                                                epsilon=conf.epsilon)
@@ -88,16 +88,10 @@ def train(train_triples, train_pos1, train_pos2, train_y, conf, save_path):
 
                 for i in range(total_batch):
                     random_idx = random_ordered_idx[i * conf.batch_size: (i + 1) * conf.batch_size]
-                    batch_triples = train_triples[random_idx]
-                    batch_pos1 = train_pos1[random_idx]
-                    batch_pos2 = train_pos2[random_idx]
+                    batch_x = train_x[random_idx]
                     batch_y = train_y[random_idx]
 
-                    num_sentences = np.sum([len(tmp) for tmp in batch_triples])
-                    if num_sentences > conf.max_batch_sentences:
-                        logger.debug('out of range')
-                        continue
-                    feed_dict = unstack_next_batch(nre, batch_triples, batch_pos1, batch_pos2, batch_y)
+                    feed_dict = unstack_next_batch(nre, batch_x, batch_y, conf.max_batch_sentences)
 
                     temp, step, loss, accuracy, summary, l2_loss, final_loss = sess.run(
                         [train_op, global_step, nre.total_loss, nre.accuracy, merged_summary, nre.l2_loss,
@@ -118,15 +112,13 @@ def train(train_triples, train_pos1, train_pos2, train_y, conf, save_path):
 def main(_):
     dataset = conf.dataset
 
-    save_path = get_model_dir(conf)
+    save_path = get_model_dir(conf, ['prev_load', 'help', 'helpful', 'helpshort'])
     logger.info("Model path {}".format(save_path))
 
     if conf.is_train:
-        train_y = np.load(dataset + '/small_y.npy')
-        train_triples = np.load(dataset + '/small_word.npy')
-        train_pos1 = np.load(dataset + '/small_pos1.npy')
-        train_pos2 = np.load(dataset + '/small_pos2.npy')
-        train(train_triples, train_pos1, train_pos2, train_y, conf, save_path)
+        train_x = np.load(dataset + '/train_x.npy')
+        train_y = np.load(dataset + '/train_y.npy')
+        train(train_x, train_y, conf, save_path)
     else:
         pass
 
