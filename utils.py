@@ -23,37 +23,51 @@ def get_model_dir(config, exceptions=('help', 'helpful', 'helpshort')):
     return os.path.join('checkpoints', *names) + '/'
 
 
-def unstack_next_batch(model, triple_batch, pos1_batch, pos2_batch, y_batch):
+def unstack_next_batch(model, x_batch, y_batch, max_sentences):
     """
     Unstack original triple data into feeddict
-    :param triple_batch: batch of triples containing corresponding sentences
-    :param pos1_batch: batch of triples containing relative position w.r.t the first entity
-    :param pos2_batch: batch of triples containing relative position w.r.t the first entity
+    :param x_batch: tuple of list of list, batch of sentences of triples
     :param y_batch: batch of one-hot vector of triples
-    :param batch_size: the number of triples to be fetched
+    :param max_sentences: the maximum number of sentences to be fetched per each triple
     :return: feed_dict
     """
-    num_sentences = 0
+    cumsum_sentences = 0
     feed_sentences = []
     feed_pos1 = []
     feed_pos2 = []
-    triple_index = np.zeros(len(triple_batch) + 1)
+    triple_index = np.zeros(len(x_batch) + 1)
 
-    for i in range(len(triple_batch)):
-        triple_index[i] = num_sentences
-        num_sentences += len(triple_batch[i])
-        for sentence, pos1, pos2 in zip(triple_batch[i], pos1_batch[i], pos2_batch[i]):
-            feed_sentences.append(sentence)
-            feed_pos1.append(pos1)
-            feed_pos2.append(pos2)
+    for i in range(len(x_batch)):
+        triple_index[i] = cumsum_sentences
+        num_sen = len(x_batch[i])
+        if num_sen > max_sentences:
+            idxs = np.arange(num_sen)
+            np.random.shuffle(idxs)
+            num_sen = max_sentences
+            idxs = idxs[:num_sen]
+        else:
+            idxs = np.arange(num_sen)
+        cumsum_sentences += num_sen
 
-    triple_index[-1] = num_sentences
+        for j in idxs:
+            word_list = []
+            pos1_list = []
+            pos2_list = []
+            for word, pos1, pos2 in x_batch[i][j]:
+                word_list.append(word)
+                pos1_list.append(pos1)
+                pos2_list.append(pos2)
+            feed_sentences.append(word_list)
+            feed_pos1.append(pos1_list)
+            feed_pos2.append(pos2_list)
+
+    triple_index[-1] = cumsum_sentences
     feed_sentences = np.array(feed_sentences)
     feed_pos1 = np.array(feed_pos1)
     feed_pos2 = np.array(feed_pos2)
     feed_y = y_batch
 
-    feed_dict = {}
+    feed_dict = dict()
     feed_dict[model.input_sentences] = feed_sentences
     feed_dict[model.input_pos1] = feed_pos1
     feed_dict[model.input_pos2] = feed_pos2
