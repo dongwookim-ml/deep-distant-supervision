@@ -50,16 +50,24 @@ class NRE:
 
         # forward and backward cell
         rnn_fw_cell = rnn.GRUCell(num_hidden, name='forward-gru')
-        rnn_bw_cell = rnn.GRUCell(num_hidden, name='backward-gru')
-        num_hidden_rnn = 2 * num_hidden
+        num_hidden_rnn = num_hidden
+        if conf.bidirectional:
+            rnn_bw_cell = rnn.GRUCell(num_hidden, name='backward-gru')
+            num_hidden_rnn = 2 * num_hidden
 
+        # add dropout-layer to the output of rnn
         if conf.dropout and conf.is_train:
             rnn_fw_cell = rnn.DropoutWrapper(rnn_fw_cell, output_keep_prob=conf.keep_prob)
-            rnn_bw_cell = rnn.DropoutWrapper(rnn_bw_cell, output_keep_prob=conf.keep_prob)
+            if conf.bidirectional:
+                rnn_bw_cell = rnn.DropoutWrapper(rnn_bw_cell, output_keep_prob=conf.keep_prob)
 
+        # construct rnn with high-level api
         with tf.variable_scope("RNN"):
-            output_rnn, _, _ = rnn.static_bidirectional_rnn(rnn_fw_cell, rnn_bw_cell, input_forward,
-                                                            dtype=tf.float32)
+            if conf.bidirectional:
+                output_rnn, _, _ = rnn.static_bidirectional_rnn(rnn_fw_cell, rnn_bw_cell, input_forward,
+                                                                dtype=tf.float32)
+            else:
+                output_rnn, _ = rnn.static_rnn(rnn_fw_cell, input_forward, dtype=tf.float32)
             output_rnn = tf.reshape(output_rnn, [num_sentences, len_sentence, num_hidden_rnn])
 
         # word-level attention layer, represent a sentence as a weighted sum of word vectors
@@ -93,6 +101,7 @@ class NRE:
                         [1, num_triple_sentence])
                     triple_embedding = tf.reshape(tf.matmul(sentence_weight, target_sentences), [num_hidden_rnn, 1])
                 else:
+                    # use mean vector if sentence-level attention layer is not used
                     triple_embedding = tf.reduce_mean(target_sentences, 0)
 
                 triple_output = tf.add(tf.reshape(tf.matmul(rel_embedding, triple_embedding), [num_relation]), rel_bias)
