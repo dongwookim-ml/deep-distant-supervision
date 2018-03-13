@@ -12,14 +12,16 @@ flags = tf.app.flags
 flags.DEFINE_boolean('word_attn', True, 'Whether to use word-level attention')
 flags.DEFINE_boolean('sent_attn', True, 'Whether to use sentence-level attention')
 flags.DEFINE_integer('num_hidden', 256, 'The number of hidden unit')
+flags.DEFINE_integer('num_filter', 32, 'The number of filter in cnn (if network_type=cnn)')
 flags.DEFINE_integer('pos_dim', 5, 'The dimensionality of position embedding')
 flags.DEFINE_boolean('bidirectional', True, 'Whether to define bidirectional rnn')
 flags.DEFINE_integer('num_relation', 53, 'The number of relations to be classified')
 flags.DEFINE_integer('max_position', 123, 'The upper bound on relative position')
 flags.DEFINE_integer('len_sentence', 70, 'The upper bound on sentence length')
-flags.DEFINE_boolean('dropout', True, 'If true, apply dropout layer')
+flags.DEFINE_boolean('dropout', True, 'If true, apply dropout layer after rnn layer')
 flags.DEFINE_float('keep_prob', 0.5, 'Dropout: probability of keeping a variable')
 flags.DEFINE_string('save_path', '', 'Model save path')
+flags.DEFINE_string('network_type', 'rnn', 'Model type [rnn, cnn]')
 
 # Training
 flags.DEFINE_boolean('is_train', True, 'Whether to do training or testing')

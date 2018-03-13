@@ -50,6 +50,8 @@ def unstack_next_batch(model, x_batch, y_batch, max_sentences):
         cumsum_sentences += num_sen
 
         for j in idxs:
+            # TODO: Positions can be computed on the fly if the position of two entities are given.
+            # TODO: This will reduce IO time
             word_list = []
             pos1_list = []
             pos2_list = []

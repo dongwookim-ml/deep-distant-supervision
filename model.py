@@ -19,11 +19,15 @@ class NRE:
         batch_size = conf.batch_size
         reg_weight = conf.reg_weight
 
+        # Note that the first dimension of input_sentence and input_y are different because each row in input_y is per
+        # triple, whereas each row in input_sentences corresponds to a single sentence and a triple consists of multiple
+        # sentences. We use input_triple_index to align sentences with corresponding label
+        # for example, label of input_sentences[input_triple_index[0]:input_triple_index[1]] is input[0]
         self.input_sentences = tf.placeholder(dtype=tf.int32, shape=[None, len_sentence], name='input_sentence')
         self.input_pos1 = tf.placeholder(dtype=tf.int32, shape=[None, len_sentence], name='input_position1')
         self.input_pos2 = tf.placeholder(dtype=tf.int32, shape=[None, len_sentence], name='input_position2')
         self.input_y = tf.placeholder(dtype=tf.int32, shape=[None, num_relation], name='input_y')
-        self.input_triple_index = tf.placeholder(dtype=tf.int32, shape=[None])
+        self.input_triple_index = tf.placeholder(dtype=tf.int32, shape=[None], name='input_triple_index')
 
         self.prob = []
         self.predictions = []
@@ -41,54 +45,51 @@ class NRE:
         self.pos2vec2 = tf.get_variable(shape=[max_position, pos_dim], name="pos2vec2")
 
         # concatenate word embedding + position embeddings
-        # input_forward & backward = [num_sentence, len_sentence, w2v_dim+2*p2v_dim]
+        # input_forward.shape = [num_sentence, len_sentence, w2v_dim+2*conf.pos_dim]
         input_forward = tf.concat([tf.nn.embedding_lookup(self.word2vec, self.input_sentences),
                                    tf.nn.embedding_lookup(self.pos2vec1, self.input_pos1),
                                    tf.nn.embedding_lookup(self.pos2vec2, self.input_pos2)], 2)
 
-        input_forward = tf.unstack(input_forward, len_sentence, 1)
-
-        # forward and backward cell
-        rnn_fw_cell = rnn.GRUCell(num_hidden, name='forward-gru')
-        num_hidden_rnn = num_hidden
-        if conf.bidirectional:
-            rnn_bw_cell = rnn.GRUCell(num_hidden, name='backward-gru')
-            num_hidden_rnn = 2 * num_hidden
-
-        # add dropout-layer to the output of rnn
-        if conf.dropout and conf.is_train:
-            rnn_fw_cell = rnn.DropoutWrapper(rnn_fw_cell, output_keep_prob=conf.keep_prob)
-            if conf.bidirectional:
-                rnn_bw_cell = rnn.DropoutWrapper(rnn_bw_cell, output_keep_prob=conf.keep_prob)
-
-        # construct rnn with high-level api
         with tf.variable_scope("RNN"):
+            input_forward = tf.unstack(input_forward, len_sentence, 1)
+            # forward and backward cell
+            rnn_fw_cell = rnn.GRUCell(num_hidden, name='forward-gru')
+            if conf.bidirectional:
+                rnn_bw_cell = rnn.GRUCell(num_hidden, name='backward-gru')
+                num_hidden = 2 * num_hidden
+
+            # add dropout-layer to the output of rnn
+            if conf.dropout and conf.is_train:
+                rnn_fw_cell = rnn.DropoutWrapper(rnn_fw_cell, output_keep_prob=conf.keep_prob)
+                if conf.bidirectional:
+                    rnn_bw_cell = rnn.DropoutWrapper(rnn_bw_cell, output_keep_prob=conf.keep_prob)
+
+            # construct rnn with high-level api
             if conf.bidirectional:
                 output_rnn, _, _ = rnn.static_bidirectional_rnn(rnn_fw_cell, rnn_bw_cell, input_forward,
                                                                 dtype=tf.float32)
             else:
                 output_rnn, _ = rnn.static_rnn(rnn_fw_cell, input_forward, dtype=tf.float32)
-            output_rnn = tf.reshape(output_rnn, [num_sentences, len_sentence, num_hidden_rnn])
+            output_hidden = tf.reshape(output_rnn, [num_sentences, len_sentence, num_hidden])
 
-        # word-level attention layer, represent a sentence as a weighted sum of word vectors
-        with tf.variable_scope("word-attn"):
-            if conf.word_attn:
-                word_attn = tf.get_variable('W', shape=[num_hidden_rnn, 1])
-                word_weight = tf.matmul(
-                    tf.reshape(activate_fn(output_rnn), [num_sentences * len_sentence, num_hidden_rnn]), word_attn)
-                word_weight = tf.reshape(word_weight, [num_sentences, len_sentence])
-                sentence_embedding = tf.matmul(
-                    tf.reshape(tf.nn.softmax(word_weight, axis=1), [num_sentences, 1, len_sentence]),
-                    output_rnn)
-                sentence_embedding = tf.reshape(sentence_embedding, [num_sentences, num_hidden_rnn])
-            else:
-                sentence_embedding = tf.reduce_mean(output_rnn, 1)
+            # word-level attention layer, represent a sentence as a weighted sum of word vectors
+            with tf.variable_scope("word-attn"):
+                if conf.word_attn:
+                    word_attn = tf.get_variable('W', shape=[num_hidden, 1])
+                    word_weight = tf.matmul(
+                        tf.reshape(activate_fn(output_hidden), [num_sentences * len_sentence, num_hidden]), word_attn)
+                    word_weight = tf.reshape(word_weight, [num_sentences, len_sentence])
+                    sentence_embedding = tf.matmul(
+                        tf.reshape(tf.nn.softmax(word_weight, axis=1), [num_sentences, 1, len_sentence]),
+                        output_hidden)
+                    sentence_embedding = tf.reshape(sentence_embedding, [num_sentences, num_hidden])
+                else:
+                    sentence_embedding = tf.reduce_mean(output_hidden, 1)
 
         # sentence-level attention layer, represent a triple as a weighted sum of sentences
         with tf.variable_scope("sentence-attn"):
-            rel_embedding = tf.get_variable('R', shape=[num_relation, num_hidden_rnn])
-            rel_bias = tf.get_variable('R_bias', shape=num_relation)
-            weight = tf.get_variable("W", shape=[num_hidden_rnn, 1])
+            attn_weight = tf.get_variable("W", shape=[num_hidden, 1])
+            triple_embeddings = list()
 
             for i in range(batch_size):
                 target_sentences = sentence_embedding[self.input_triple_index[i]:self.input_triple_index[i + 1]]
@@ -97,27 +98,23 @@ class NRE:
                     num_triple_sentence = self.input_triple_index[i + 1] - self.input_triple_index[i]
                     triple_sentences = activate_fn(target_sentences)
                     sentence_weight = tf.reshape(
-                        tf.nn.softmax(tf.reshape(tf.matmul(triple_sentences, weight), [num_triple_sentence])),
+                        tf.nn.softmax(tf.reshape(tf.matmul(triple_sentences, attn_weight), [num_triple_sentence])),
                         [1, num_triple_sentence])
-                    triple_embedding = tf.reshape(tf.matmul(sentence_weight, target_sentences), [num_hidden_rnn, 1])
+                    triple_embedding = tf.squeeze(tf.matmul(sentence_weight, target_sentences))  # [num_hidden]
                 else:
                     # use mean vector if sentence-level attention layer is not used
-                    triple_embedding = tf.reduce_mean(target_sentences, 0)
+                    triple_embedding = tf.squeeze(tf.reduce_mean(target_sentences, 0))
+                triple_embeddings.append(triple_embedding)
 
-                triple_output = tf.add(tf.reshape(tf.matmul(rel_embedding, triple_embedding), [num_relation]), rel_bias)
+            triple_embeddings = tf.reshape(triple_embeddings, [num_sentences, num_hidden])
+            triple_output = tf.layers.dense(triple_embeddings, num_relation, name='fc-output', reuse=tf.AUTO_REUSE)
 
-                self.prob.append(tf.nn.softmax(triple_output))
-                self.predictions.append(tf.argmax(self.prob[i], 0, name="predictions"))
-                self.loss.append(
-                    tf.reduce_mean(
-                        tf.nn.softmax_cross_entropy_with_logits_v2(logits=triple_output, labels=self.input_y[i])))
-                if i == 0:
-                    self.total_loss = self.loss[i]
-                else:
-                    self.total_loss += self.loss[i]
-                self.accuracy.append(
-                    tf.reduce_mean(tf.cast(tf.equal(self.predictions[i], tf.argmax(self.input_y[i], 0)), "float"),
-                                   name="accuracy"))
+            self.prob = tf.nn.softmax(triple_output)
+            self.predictions = tf.argmax(self.prob, axis=1, name="predictions")
+            self.total_loss = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits_v2(logits=triple_output, labels=self.input_y), name="loss")
+            self.accuracy = tf.reduce_mean(
+                tf.cast(tf.equal(self.predictions, tf.argmax(self.input_y, 1)), "float"), name="accuracy")
 
         tf.summary.scalar("loss", self.total_loss)
         # regularization
