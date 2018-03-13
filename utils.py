@@ -5,7 +5,7 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
-def get_model_dir(config, exceptions=('help', 'helpful', 'helpshort')):
+def get_model_dir(config, exceptions=('help', 'helpfull', 'helpshort')):
     """ Return model save path with model parameters
     :param config: tf.app.flags.FLAGS, configuration values will be used to generate the path where the model is saved
     :param exceptions: iterable, will not be included in the saving path
@@ -20,7 +20,7 @@ def get_model_dir(config, exceptions=('help', 'helpful', 'helpshort')):
         if key not in exceptions:
             names.append("%s=%s" % (key, ",".join([str(i) for i in config[key].value]) if type(
                 config[key].value) == list else config[key].value))
-    return os.path.join('checkpoints', *names) + '/'
+    return os.path.join('./checkpoints', *names) + '/'
 
 
 def unstack_next_batch(model, x_batch, y_batch, max_sentences):
