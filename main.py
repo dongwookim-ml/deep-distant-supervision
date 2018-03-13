@@ -73,7 +73,7 @@ def train(train_triples, train_pos1, train_pos2, train_y, conf, save_path):
             sess.run(tf.global_variables_initializer())
 
             saver = tf.train.Saver()
-            if tf.train.latest_checkpoint(save_path):
+            if tf.train.latest_checkpoint(save_path) and conf.load_prev:
                 saver.restore(sess, save_path)
                 logger.info("Last Session Restored")
 
