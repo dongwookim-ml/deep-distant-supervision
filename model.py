@@ -53,9 +53,9 @@ class NRE:
         with tf.variable_scope("RNN"):
             input_forward = tf.unstack(input_forward, len_sentence, 1)
             # forward and backward cell
-            rnn_fw_cell = rnn.GRUCell(num_hidden)
+            rnn_fw_cell = rnn.GRUCell(num_hidden, activation=tf.nn.tanh)
             if conf.bidirectional:
-                rnn_bw_cell = rnn.GRUCell(num_hidden)
+                rnn_bw_cell = rnn.GRUCell(num_hidden, activation=tf.nn.tanh)
                 num_hidden = 2 * num_hidden
 
             # add dropout-layer to the output of rnn
