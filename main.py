@@ -1,9 +1,11 @@
 import logging
-import tensorflow as tf
-import numpy as np
 import model
 import os
 import sys
+import tensorflow as tf
+import numpy as np
+from tqdm import tqdm
+from sklearn.metrics import roc_auc_score
 from utils import get_model_dir, unstack_next_batch
 
 flags = tf.app.flags
@@ -37,6 +39,10 @@ flags.DEFINE_string('dataset', 'data/nyt', 'path to the dataset')
 flags.DEFINE_integer('print_gap', 50, 'Print status every print_gap iteration')
 flags.DEFINE_integer('save_gap', 1000, 'Save model every save_gap iteration to save_path')
 
+# Testing
+flags.DEFINE_integer('test_step', -1, 'Specify trained model by global step, if -1 use the latest checkpoint')
+flags.DEFINE_string('top_n', '[100,200,300]', 'Precision at K')
+
 # Optimizer
 flags.DEFINE_float('reg_weight', 0.0001, 'Weight of regularizer on model parameters')
 flags.DEFINE_float('learning_rate', 0.001, 'The learning rate of training')
@@ -59,7 +65,10 @@ exclude_list = ['save_path',
                 'helpfull',
                 'helpshort',
                 'save_gap',
-                'print_gap'
+                'print_gap',
+                'test_step',
+                'is_train',
+                'top_n'
                 ]
 
 # Logger
@@ -68,6 +77,64 @@ ch.setFormatter(logging.Formatter('%(name)s:%(levelname)s:%(asctime)s:%(message)
 logger = logging.getLogger()
 logger.addHandler(ch)
 logger.setLevel(conf.log_level)
+
+
+def test(test_x, test_y, conf, save_path):
+    """
+    Compute precision at conf.top_n and roc-auc score given trained model with test set
+
+    :param test_x: test triples
+    :param test_y: a set of binary vectors
+    :param conf: configuration
+    :param save_path: path to the saved model
+    """
+    with tf.Session() as sess:
+        with tf.variable_scope("model", reuse=None):
+            if conf.pretrained_w2v:
+                word_embedding = np.load(conf.w2v_path)
+                nre = model.NRE(conf, word_embedding)
+            else:
+                nre = model.NRE(conf)
+
+        saver = tf.train.Saver()
+        if conf.test_step == -1:
+            ckpt = tf.train.latest_checkpoint(save_path)
+        else:
+            ckpt = save_path + str(conf.test_step)
+
+        if ckpt == None:
+            logger.info("Model doesn't exist")
+            return
+
+        saver.restore(sess, ckpt)
+        logger.info("Last Session Restored")
+
+        num_triples = len(test_x)  # total number of triples to be trained
+        total_batch = int(num_triples / float(conf.batch_size))
+        all_prob = np.zeros([num_triples, conf.num_relation])
+        for i in tqdm(range(total_batch)):
+            batch_x = test_x[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)]
+            batch_y = test_y[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)]
+
+            feed_dict = unstack_next_batch(nre, batch_x, batch_y, conf.max_batch_sentences)
+
+            prob, loss, accuracy, l2_loss, final_loss = sess.run(
+                [nre.prob, nre.total_loss, nre.accuracy, nre.l2_loss,
+                 nre.final_loss], feed_dict)
+
+            all_prob[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)] = prob
+
+        target_prob = np.reshape(all_prob[:, 1:], (-1))
+        target_y = np.reshape(test_y[:, 1:], (-1))
+        ordered_idx = np.argsort(target_prob)
+        top_n = eval(conf.top_n)
+        prec_at_n = np.zeros(len(top_n))
+        for i, top_k in enumerate(top_n):
+            prec_at_n[i] = np.sum(target_y[ordered_idx][:top_k])/float(top_k)
+            logger.info("Precision @ {}:{:g}".format(top_k, prec_at_n[i]))
+
+        roc_auc = roc_auc_score(target_y, target_prob)
+        logger.info("ROC-AUC score:{:g}".format(roc_auc))
 
 
 def train(train_x, train_y, conf, save_path):
@@ -95,7 +162,6 @@ def train(train_x, train_y, conf, save_path):
         saver = tf.train.Saver()
         last_ckpt = tf.train.latest_checkpoint(save_path)
         if last_ckpt and conf.load_prev:
-            logger.info("Restore last session from {}".format(last_ckpt))
             saver.restore(sess, last_ckpt)
             logger.info("Last Session Restored")
 
@@ -106,7 +172,7 @@ def train(train_x, train_y, conf, save_path):
             total_batch = int(num_triples / float(conf.batch_size))
 
             for i in range(total_batch):
-                random_idx = random_ordered_idx[i * conf.batch_size: (i + 1) * conf.batch_size]
+                random_idx = random_ordered_idx[i * conf.batch_size: min((i + 1) * conf.batch_size, num_triples)]
                 batch_x = train_x[random_idx]
                 batch_y = train_y[random_idx]
 
@@ -141,7 +207,9 @@ def main(_):
         train_y = np.load(dataset + '/train_y.npy')
         train(train_x, train_y, conf, save_path)
     else:
-        pass
+        test_x = np.load(dataset + '/test_x.npy')
+        test_y = np.load(dataset + '/test_y.npy')
+        test(test_x, test_y, conf, save_path)
 
 
 if __name__ == '__main__':
