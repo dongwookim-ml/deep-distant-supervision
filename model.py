@@ -53,9 +53,9 @@ class NRE:
         with tf.variable_scope("RNN"):
             input_forward = tf.unstack(input_forward, len_sentence, 1)
             # forward and backward cell
-            rnn_fw_cell = rnn.GRUCell(num_hidden, name='forward-gru')
+            rnn_fw_cell = rnn.GRUCell(num_hidden)
             if conf.bidirectional:
-                rnn_bw_cell = rnn.GRUCell(num_hidden, name='backward-gru')
+                rnn_bw_cell = rnn.GRUCell(num_hidden)
                 num_hidden = 2 * num_hidden
 
             # add dropout-layer to the output of rnn
@@ -80,7 +80,7 @@ class NRE:
                         tf.reshape(activate_fn(output_hidden), [num_sentences * len_sentence, num_hidden]), word_attn)
                     word_weight = tf.reshape(word_weight, [num_sentences, len_sentence])
                     sentence_embedding = tf.matmul(
-                        tf.reshape(tf.nn.softmax(word_weight, axis=1), [num_sentences, 1, len_sentence]),
+                        tf.reshape(tf.nn.softmax(word_weight), [num_sentences, 1, len_sentence]),
                         output_hidden)
                     sentence_embedding = tf.reshape(sentence_embedding, [num_sentences, num_hidden])
                 else:
@@ -106,13 +106,13 @@ class NRE:
                     triple_embedding = tf.squeeze(tf.reduce_mean(target_sentences, 0))
                 triple_embeddings.append(triple_embedding)
 
-            triple_embeddings = tf.reshape(triple_embeddings, [num_sentences, num_hidden])
-            triple_output = tf.layers.dense(triple_embeddings, num_relation, name='fc-output', reuse=tf.AUTO_REUSE)
+            triple_embeddings = tf.reshape(triple_embeddings, [-1, num_hidden])
+            triple_output = tf.layers.dense(triple_embeddings, num_relation, name='fc-output')
 
             self.prob = tf.nn.softmax(triple_output)
             self.predictions = tf.argmax(self.prob, axis=1, name="predictions")
             self.total_loss = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits_v2(logits=triple_output, labels=self.input_y), name="loss")
+                tf.nn.softmax_cross_entropy_with_logits(logits=triple_output, labels=self.input_y), name="loss")
             self.accuracy = tf.reduce_mean(
                 tf.cast(tf.equal(self.predictions, tf.argmax(self.input_y, 1)), "float"), name="accuracy")
 

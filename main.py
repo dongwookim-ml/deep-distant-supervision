@@ -88,7 +88,10 @@ def test(test_x, test_y, conf, save_path):
     :param conf: configuration
     :param save_path: path to the saved model
     """
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(config=config) as sess:
         with tf.variable_scope("model", reuse=None):
             if conf.pretrained_w2v:
                 word_embedding = np.load(conf.w2v_path)
@@ -124,13 +127,13 @@ def test(test_x, test_y, conf, save_path):
 
             all_prob[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)] = prob
 
-        target_prob = np.reshape(all_prob[:, 1:], (-1))
+        target_prob = np.reshape(all_prob[:, 1:], (-1))  # note that the relation of the first column is NA
         target_y = np.reshape(test_y[:, 1:], (-1))
-        ordered_idx = np.argsort(target_prob)
+        ordered_idx = np.argsort(-target_prob)
         top_n = eval(conf.top_n)
         prec_at_n = np.zeros(len(top_n))
         for i, top_k in enumerate(top_n):
-            prec_at_n[i] = np.sum(target_y[ordered_idx][:top_k])/float(top_k)
+            prec_at_n[i] = np.sum(target_y[ordered_idx][:top_k], dtype=float)/float(top_k)
             logger.info("Precision @ {}:{:g}".format(top_k, prec_at_n[i]))
 
         roc_auc = roc_auc_score(target_y, target_prob)
@@ -138,7 +141,10 @@ def test(test_x, test_y, conf, save_path):
 
 
 def train(train_x, train_y, conf, save_path):
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
+    with tf.Session(config=config) as sess:
         initializer = tf.contrib.layers.xavier_initializer()
 
         with tf.variable_scope("model", reuse=None, initializer=initializer):
@@ -171,7 +177,7 @@ def train(train_x, train_y, conf, save_path):
             np.random.shuffle(random_ordered_idx)
             total_batch = int(num_triples / float(conf.batch_size))
 
-            for i in range(total_batch):
+            for i in tqdm(range(total_batch), initial=total_batch*one_epoch, total=total_batch*conf.num_epoch):
                 random_idx = random_ordered_idx[i * conf.batch_size: min((i + 1) * conf.batch_size, num_triples)]
                 batch_x = train_x[random_idx]
                 batch_y = train_y[random_idx]

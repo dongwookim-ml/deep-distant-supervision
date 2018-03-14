@@ -12,14 +12,17 @@ def get_model_dir(config, exceptions=('help', 'helpfull', 'helpshort')):
     :return: model save path
     """
 
-    attrs = config.__dict__['__wrapped']
+    try:
+        attrs = config.flag_values_dict()
+    except:
+        # for tensorflow 1.2 (not sure which other versions use this structure except 1.2)
+        attrs = config.__flags
 
     names = []
-    keys = dir(attrs)
-    for key in keys:
+    for key, value in attrs.items():
         if key not in exceptions:
-            names.append("%s=%s" % (key, ",".join([str(i) for i in config[key].value]) if type(
-                config[key].value) == list else config[key].value))
+            names.append("%s=%s" % (key, ",".join([str(i) for i in value]) if type(
+                value) == list else value))
     return os.path.join('./checkpoints', *names) + '/'
 
 
@@ -51,7 +54,7 @@ def unstack_next_batch(model, x_batch, y_batch, max_sentences):
 
         for j in idxs:
             # TODO: Positions can be computed on the fly if the position of two entities are given.
-            # TODO: This will reduce IO time
+            # TODO: This will reduce IO time to load dataset
             word_list = []
             pos1_list = []
             pos2_list = []
