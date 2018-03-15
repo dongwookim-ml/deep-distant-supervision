@@ -6,20 +6,21 @@ import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
-from utils import get_model_dir, unstack_next_batch
+from utils import get_model_dir, unstack_next_batch, unstack_data
 
 flags = tf.app.flags
 
 # Model
 flags.DEFINE_boolean('word_attn', True, 'Whether to use word-level attention')
 flags.DEFINE_boolean('sent_attn', True, 'Whether to use sentence-level attention')
-flags.DEFINE_integer('num_hidden', 256, 'The number of hidden unit')
+flags.DEFINE_integer('num_hidden', 230, 'The number of hidden unit')
 flags.DEFINE_integer('num_filter', 32, 'The number of filter in cnn (if network_type=cnn)')
 flags.DEFINE_integer('pos_dim', 5, 'The dimensionality of position embedding')
 flags.DEFINE_boolean('bidirectional', True, 'Whether to define bidirectional rnn')
 flags.DEFINE_integer('num_relation', 53, 'The number of relations to be classified')
 flags.DEFINE_integer('max_position', 123, 'The upper bound on relative position')
 flags.DEFINE_integer('len_sentence', 70, 'The upper bound on sentence length')
+flags.DEFINE_integer('num_layer', 1, 'The number of hidden layers, default=1')
 flags.DEFINE_boolean('dropout', True, 'If true, apply dropout layer after rnn layer')
 flags.DEFINE_float('keep_prob', 0.5, 'Dropout: probability of keeping a variable')
 flags.DEFINE_string('save_path', '', 'Model save path')
@@ -33,7 +34,7 @@ flags.DEFINE_integer('batch_size', 48,
 flags.DEFINE_boolean('pretrained_w2v', True,
                      'Use pretrained word2vec if True, note that the word id should be aligned with the word2vec id')
 flags.DEFINE_string('w2v_path', 'data/vec.npy', 'Path to the pretrained word2vec')
-flags.DEFINE_integer('num_epoch', 10, 'The number of epochs used for training')
+flags.DEFINE_integer('num_epoch', 3, 'The number of epochs used for training')
 flags.DEFINE_integer('max_batch_sentences', 1500, 'The maximum number of sentences to be batched for each triple')
 flags.DEFINE_string('dataset', 'data/nyt', 'path to the dataset')
 flags.DEFINE_integer('print_gap', 50, 'Print status every print_gap iteration')
@@ -88,10 +89,22 @@ def test(test_x, test_y, conf, save_path):
     :param conf: configuration
     :param save_path: path to the saved model
     """
+    test_x, test_y = unstack_data(test_x, test_y, conf.max_batch_sentences)
+    num_triples = len(test_x)  # total number of triples to be trained
+
+    batch_size = conf.batch_size
+    while num_triples % batch_size:
+        # there should be no remainder
+        batch_size += 1
+    conf.batch_size = batch_size
+
+    total_batch = int(num_triples / float(batch_size))
+
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
     with tf.Session(config=config) as sess:
+
         with tf.variable_scope("model", reuse=None):
             if conf.pretrained_w2v:
                 word_embedding = np.load(conf.w2v_path)
@@ -112,14 +125,12 @@ def test(test_x, test_y, conf, save_path):
         saver.restore(sess, ckpt)
         logger.info("Last Session Restored")
 
-        num_triples = len(test_x)  # total number of triples to be trained
-        total_batch = int(num_triples / float(conf.batch_size))
         all_prob = np.zeros([num_triples, conf.num_relation])
         for i in tqdm(range(total_batch)):
-            batch_x = test_x[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)]
-            batch_y = test_y[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)]
+            batch_x = test_x[i * batch_size:min((i + 1) * batch_size, num_triples)]
+            batch_y = test_y[i * batch_size:min((i + 1) * batch_size, num_triples)]
 
-            feed_dict = unstack_next_batch(nre, batch_x, batch_y, conf.max_batch_sentences)
+            feed_dict = unstack_next_batch(nre, batch_x, batch_y)
 
             prob, loss, accuracy, l2_loss, final_loss = sess.run(
                 [nre.prob, nre.total_loss, nre.accuracy, nre.l2_loss,
@@ -133,7 +144,7 @@ def test(test_x, test_y, conf, save_path):
         top_n = eval(conf.top_n)
         prec_at_n = np.zeros(len(top_n))
         for i, top_k in enumerate(top_n):
-            prec_at_n[i] = np.sum(target_y[ordered_idx][:top_k], dtype=float)/float(top_k)
+            prec_at_n[i] = np.sum(target_y[ordered_idx][:top_k], dtype=float) / float(top_k)
             logger.info("Precision @ {}:{:g}".format(top_k, prec_at_n[i]))
 
         roc_auc = roc_auc_score(target_y, target_prob)
@@ -154,7 +165,6 @@ def train(train_x, train_y, conf, save_path):
             else:
                 nre = model.NRE(conf)
 
-        num_triples = len(train_x)  # total number of triples to be trained
         global_step = tf.Variable(0, name="global_step", trainable=False)
         optimizer = tf.train.AdamOptimizer(learning_rate=conf.learning_rate, beta1=conf.beta1, beta2=conf.beta2,
                                            epsilon=conf.epsilon)
@@ -164,6 +174,7 @@ def train(train_x, train_y, conf, save_path):
 
         merged_summary = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter('./logs/%s' % (save_path), graph=sess.graph)
+        assert_op = tf.group(*tf.get_collection('Asserts'))
 
         saver = tf.train.Saver()
         last_ckpt = tf.train.latest_checkpoint(save_path)
@@ -171,22 +182,31 @@ def train(train_x, train_y, conf, save_path):
             saver.restore(sess, last_ckpt)
             logger.info("Last Session Restored")
 
+        variables_names = [v.name for v in tf.trainable_variables()]
+        values = sess.run(variables_names)
+        for k, v in zip(variables_names, values):
+            # print trainable variables and their shapes
+            logger.debug("Trainable variable: {}\tShape: {}".format(k, v.shape))
+
+        train_x, train_y = unstack_data(train_x, train_y, conf.max_batch_sentences)
+        num_triples = len(train_x)  # total number of triples to be trained
+
         for one_epoch in range(conf.num_epoch):
             # randomly shuffle index of training set
             random_ordered_idx = np.arange(num_triples)
             np.random.shuffle(random_ordered_idx)
-            total_batch = int(num_triples / float(conf.batch_size))
+            total_batch = int(num_triples / float(conf.batch_size))  # note that the final one batch will not be used
 
-            for i in tqdm(range(total_batch), initial=total_batch*one_epoch, total=total_batch*conf.num_epoch):
+            for i in tqdm(range(total_batch), initial=total_batch * one_epoch, total=total_batch * conf.num_epoch):
                 random_idx = random_ordered_idx[i * conf.batch_size: min((i + 1) * conf.batch_size, num_triples)]
                 batch_x = train_x[random_idx]
                 batch_y = train_y[random_idx]
 
-                feed_dict = unstack_next_batch(nre, batch_x, batch_y, conf.max_batch_sentences)
+                feed_dict = unstack_next_batch(nre, batch_x, batch_y)
 
-                temp, step, loss, accuracy, summary, l2_loss, final_loss = sess.run(
+                temp, step, loss, accuracy, summary, l2_loss, final_loss, _ = sess.run(
                     [train_op, global_step, nre.total_loss, nre.accuracy, merged_summary, nre.l2_loss,
-                     nre.final_loss], feed_dict)
+                     nre.final_loss, assert_op], feed_dict)
 
                 summary_writer.add_summary(summary, global_step=step)
 
