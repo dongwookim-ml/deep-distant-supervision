@@ -174,7 +174,7 @@ def train(train_x, train_y, conf, save_path):
 
         merged_summary = tf.summary.merge_all()
         summary_writer = tf.summary.FileWriter('./logs/%s' % (save_path), graph=sess.graph)
-        assert_op = tf.group(*tf.get_collection('Asserts'))
+        assert_op = tf.group(*tf.get_collection('Asserts'))  # collect all assert ops from collection name 'Asserts'
 
         saver = tf.train.Saver()
         last_ckpt = tf.train.latest_checkpoint(save_path)
