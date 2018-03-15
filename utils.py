@@ -25,13 +25,29 @@ def get_model_dir(config, exceptions=('help', 'helpfull', 'helpshort')):
                 value) == list else value))
     return os.path.join('./checkpoints', *names) + '/'
 
+def unstack_data(train_x, train_y, max_sen):
+    """ If a certain triple has more than max_sen sentences divide it into small pieces """
+    unstacked_x = list()
+    unstacked_y = list()
 
-def unstack_next_batch(model, x_batch, y_batch, max_sentences):
+    for x, y in zip(train_x, train_y):
+        if len(x) > max_sen:
+            total_sen = len(x)
+            for i in range(int(total_sen/max_sen)+1):
+                if i*max_sen != min((i+1)*max_sen, total_sen):
+                    unstacked_x.append(x[i*max_sen:min((i+1)*max_sen, total_sen)])
+                    unstacked_y.append(y)
+        else:
+            unstacked_x.append(x)
+            unstacked_y.append(y)
+
+    return np.array(unstacked_x), np.array(unstacked_y)
+
+def unstack_next_batch(model, x_batch, y_batch):
     """
     Unstack original triple data into feeddict
     :param x_batch: tuple of list of list, batch of sentences of triples
     :param y_batch: batch of one-hot vector of triples
-    :param max_sentences: the maximum number of sentences to be fetched per each triple
     :return: feed_dict
     """
     cumsum_sentences = 0
@@ -43,16 +59,9 @@ def unstack_next_batch(model, x_batch, y_batch, max_sentences):
     for i in range(len(x_batch)):
         triple_index[i] = cumsum_sentences
         num_sen = len(x_batch[i])
-        if num_sen > max_sentences:
-            idxs = np.arange(num_sen)
-            np.random.shuffle(idxs)
-            num_sen = max_sentences
-            idxs = idxs[:num_sen]
-        else:
-            idxs = np.arange(num_sen)
         cumsum_sentences += num_sen
 
-        for j in idxs:
+        for j in range(num_sen):
             # TODO: Positions can be computed on the fly if the position of two entities are given.
             # TODO: This will reduce IO time to load dataset
             word_list = []
