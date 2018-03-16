@@ -51,7 +51,7 @@ class NRE:
             rnn_fw_cell = rnn.GRUCell(num_hidden, activation=tf.nn.tanh)
             if conf.bidirectional:
                 rnn_bw_cell = rnn.GRUCell(num_hidden, activation=tf.nn.tanh)
-                # num_hidden = 2 * num_hidden
+                num_hidden = 2 * num_hidden
 
             # add dropout-layer to the output of rnn
             if conf.dropout and conf.is_train:
@@ -63,8 +63,7 @@ class NRE:
             if conf.bidirectional:
                 output_rnn, _, _ = rnn.static_bidirectional_rnn(rnn_fw_cell, rnn_bw_cell, input_forward,
                                                                 dtype=tf.float32)
-                re_output_rnn = tf.reshape(tf.concat(output_rnn, 1), [num_sentences, len_sentence, 2 * num_hidden])
-                output_hidden = tf.add(re_output_rnn[:, :, :num_hidden], re_output_rnn[:, :, num_hidden:])
+                output_hidden = tf.reshape(tf.concat(output_rnn, 1), [num_sentences, len_sentence, num_hidden])
             else:
                 output_rnn, _ = rnn.static_rnn(rnn_fw_cell, input_forward, dtype=tf.float32)
                 output_hidden = tf.reshape(tf.concat(output_rnn, 1), [num_sentences, len_sentence, num_hidden])
@@ -74,7 +73,7 @@ class NRE:
                 if conf.word_attn:
                     word_attn = tf.get_variable('W', shape=[num_hidden, 1])
                     word_weight = tf.matmul(
-                        tf.reshape(activate_fn(output_hidden), [num_sentences * len_sentence, num_hidden]), word_attn)
+                        tf.reshape(output_hidden, [num_sentences * len_sentence, num_hidden]), word_attn)
                     word_weight = tf.reshape(word_weight, [num_sentences, len_sentence])
                     sentence_embedding = tf.matmul(
                         tf.reshape(tf.nn.softmax(word_weight), [num_sentences, 1, len_sentence]),
@@ -83,7 +82,8 @@ class NRE:
                 else:
                     sentence_embedding = tf.reduce_mean(output_hidden, 1)
 
-                sentence_embedding = activate_fn(sentence_embedding)
+        with tf.variable_scope("fc-hidden"):
+            h_sentence = tf.layers.dense(sentence_embedding, num_hidden, activation=activate_fn, name='fc-hidden')
 
         # sentence-level attention layer, represent a triple as a weighted sum of sentences
         with tf.variable_scope("sentence-attn"):
@@ -92,7 +92,7 @@ class NRE:
             triple_embeddings = list()
 
             for i in range(batch_size):
-                target_sentences = sentence_embedding[self.input_triple_index[i]:self.input_triple_index[i + 1]]
+                target_sentences = h_sentence[self.input_triple_index[i]:self.input_triple_index[i + 1]]
 
                 if conf.sent_attn:
                     num_triple_sentence = self.input_triple_index[i + 1] - self.input_triple_index[i]
@@ -104,7 +104,6 @@ class NRE:
                 else:
                     # use mean vector if sentence-level attention layer is not used
                     triple_embedding = tf.squeeze(tf.reduce_mean(target_sentences, 0))
-                triple_embedding = activate_fn(triple_embedding)
                 triple_embeddings.append(triple_embedding)
 
             triple_embeddings = tf.reshape(triple_embeddings, [-1, num_hidden])

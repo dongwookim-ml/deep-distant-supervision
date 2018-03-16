@@ -116,7 +116,7 @@ def test(test_x, test_y, conf, save_path):
         if conf.test_step == -1:
             ckpt = tf.train.latest_checkpoint(save_path)
         else:
-            ckpt = save_path + str(conf.test_step)
+            ckpt = save_path + '-' + str(conf.test_step)
 
         if ckpt == None:
             logger.info("Model doesn't exist")
