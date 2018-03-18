@@ -5,7 +5,7 @@ import sys
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, average_precision_score
 from utils import get_model_dir, unstack_next_batch, unstack_data
 
 flags = tf.app.flags
@@ -39,6 +39,7 @@ flags.DEFINE_integer('max_batch_sentences', 1500, 'The maximum number of sentenc
 flags.DEFINE_string('dataset', 'data/nyt', 'path to the dataset')
 flags.DEFINE_integer('print_gap', 50, 'Print status every print_gap iteration')
 flags.DEFINE_integer('save_gap', 1000, 'Save model every save_gap iteration to save_path')
+flags.DEFINE_boolean('train_validation', True, 'If true, training includes validation as well')
 
 # Testing
 flags.DEFINE_integer('test_step', -1, 'Specify trained model by global step, if -1 use the latest checkpoint')
@@ -149,6 +150,8 @@ def test(test_x, test_y, conf, save_path):
 
         roc_auc = roc_auc_score(target_y, target_prob)
         logger.info("ROC-AUC score:{:g}".format(roc_auc))
+        ap = average_precision_score(target_y, target_prob)
+        logger.info("Average Precision:{:g}".format(ap))
 
 
 def train(train_x, train_y, conf, save_path):
@@ -228,7 +231,11 @@ def main(_):
         save_path = conf.save_path
     logger.info("Model path {}".format(save_path))
 
-    if conf.is_train:
+    if conf.is_train and conf.train_validation:
+        train_x = np.load(dataset + '/train_x.npy')
+        train_y = np.load(dataset + '/train_y.npy')
+        train(train_x, train_y, conf, save_path)
+    elif conf.is_train:
         train_x = np.load(dataset + '/train_x.npy')
         train_y = np.load(dataset + '/train_y.npy')
         train(train_x, train_y, conf, save_path)
@@ -236,7 +243,6 @@ def main(_):
         test_x = np.load(dataset + '/test_x.npy')
         test_y = np.load(dataset + '/test_y.npy')
         test(test_x, test_y, conf, save_path)
-
 
 if __name__ == '__main__':
     tf.app.run()

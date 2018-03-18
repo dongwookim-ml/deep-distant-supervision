@@ -46,26 +46,24 @@ class NRE:
                                    tf.nn.embedding_lookup(self.pos2vec2, self.input_pos2)], 2)
 
         with tf.variable_scope("RNN"):
-            input_forward = tf.unstack(input_forward, len_sentence, 1)
-            # forward and backward cell
-            rnn_fw_cell = rnn.GRUCell(num_hidden, activation=tf.nn.tanh)
-            if conf.bidirectional:
-                rnn_bw_cell = rnn.GRUCell(num_hidden, activation=tf.nn.tanh)
-                num_hidden = 2 * num_hidden
+            def create_rnn_cells(num_units):
+                """return list of rnn cells"""
+                cells = [rnn.GRUCell(num_units, activation=activate_fn) for _ in range(conf.num_layer)]
+                if conf.dropout and conf.is_train:
+                    return [rnn.DropoutWrapper(cell) for cell in cells]
+                else:
+                    return cells
 
-            # add dropout-layer to the output of rnn
-            if conf.dropout and conf.is_train:
-                rnn_fw_cell = rnn.DropoutWrapper(rnn_fw_cell, output_keep_prob=conf.keep_prob)
-                if conf.bidirectional:
-                    rnn_bw_cell = rnn.DropoutWrapper(rnn_bw_cell, output_keep_prob=conf.keep_prob)
+            input_forward = tf.unstack(input_forward, len_sentence, 1)
 
             # construct rnn with high-level api
             if conf.bidirectional:
-                output_rnn, _, _ = rnn.static_bidirectional_rnn(rnn_fw_cell, rnn_bw_cell, input_forward,
-                                                                dtype=tf.float32)
+                output_rnn, _, _ = rnn.stack_bidirectional_rnn(create_rnn_cells(num_hidden), create_rnn_cells(num_hidden), input_forward,
+                                                               dtype=tf.float32)
+                num_hidden = 2 * num_hidden  # dimension of concatenated fw-bw outputs
                 output_hidden = tf.reshape(tf.concat(output_rnn, 1), [num_sentences, len_sentence, num_hidden])
             else:
-                output_rnn, _ = rnn.static_rnn(rnn_fw_cell, input_forward, dtype=tf.float32)
+                output_rnn, _ = rnn.static_rnn(create_rnn_cells(num_hidden)[0], input_forward, dtype=tf.float32)
                 output_hidden = tf.reshape(tf.concat(output_rnn, 1), [num_sentences, len_sentence, num_hidden])
 
             # word-level attention layer, represent a sentence as a weighted sum of word vectors
