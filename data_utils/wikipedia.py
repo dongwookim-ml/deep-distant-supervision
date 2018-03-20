@@ -1,5 +1,5 @@
 """
-Parsing Wikipedia corpus to obtain training set for distant supervision,
+Utils for parsing Wikipedia corpus to obtain training set for distant supervision
 
 """
 
@@ -20,7 +20,7 @@ raw_path = "../data/wikipedia/enwiki-20180301-pages-articles.xml.bz2"
 server_url = 'http://localhost:9000'  # Stanford corenlp server address
 
 
-def iter_wiki(dump_file):
+def iter_wiki(dump_file=raw_path):
     """Yield each article from the Wikipedia dump, as a `(title, tokens)` 2-tuple.
     Reference: https://radimrehurek.com/topic_modeling_tutorial/2 - Topic Modeling.html
     """
@@ -33,7 +33,6 @@ def iter_wiki(dump_file):
             if len(tokens) < 50 or any(title.startswith(ns + ':') for ns in ignore_namespaces):
                 continue  # ignore short articles and various meta-articles
             yield title, tokens
-
 
 if __name__ == '__main__':
     stream = iter_wiki(raw_path)

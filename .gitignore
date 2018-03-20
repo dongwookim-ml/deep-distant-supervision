@@ -15,6 +15,7 @@ samples
 
 # FB15K data
 FB15K-237.2/
+data/freebase/
 
 
 # Created by https://www.gitignore.io/api/python,vim
