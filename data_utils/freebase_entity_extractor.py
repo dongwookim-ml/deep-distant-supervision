@@ -1,46 +1,51 @@
 """
 Script for extracting entities from Freebase dump.
-Extremely slow. It would be better to stop the process after obtaining 20 million entities.
-    (It seems that the total number of entities are around 20 millions.)
 """
 
 import io
 import gzip
-from collections import defaultdict
-
-# constructor of nested default dictionary
-nested_dd = lambda: defaultdict(nested_dd)
 
 cnt = 0
-en_dict = nested_dd()
+en_dict = dict()
 
-with io.TextIOWrapper(gzip.open("freebase-rdf-latest.gz", "r")) as freebase:
-    with io.TextIOWrapper(open("freebase_dict.txt", 'wb'), encoding="utf-8") as f:
-        line = freebase.readline()
-        tmp = ""
-        while line is not None:
-            if "type.object.name" in line:
-                tokens = line.split('\t')
-                mid = tokens[0].split('/')[-1][:-1]
-                name = tokens[2]
+old_dicts = list()
+
+with io.TextIOWrapper(gzip.open("../data/freebase/freebase-rdf-latest.gz", "r")) as freebase:
+    for line in freebase:
+        if "type.object.name" in line:
+            tokens = line.split('\t')
+            mid = tokens[0].split('/')[-1][:-1]
+            name = tokens[2]
+            if mid.startswith('m.'):
                 if "@en" in name:
                     name = name.replace("@en", "")
                     name = name.replace("\"", "")
-                    # use the first two characters to access the first level dict
-                    en_dict[name[:2]][name] = mid
-                    # en_dict[name]=mid
-            line = freebase.readline()
+                    en_dict[name] = mid
 
-            cnt += 1
+        cnt += 1
 
-            if cnt % 10000000 == 0:
-                num_dict = 0
-                size = 0
-                for key, value in en_dict.items():
-                    size += len(en_dict[key])
-                    num_dict += 1
-                print("{} lines processed, num_dict={}, dict_size={}".format(cnt, num_dict, size))
+        if cnt % 10000000 == 0:
 
-        for key, _ in en_dict.items():
-            for key2, value2 in en_dict[key].items():
-                f.write("{}\t{}\n".format(key2, value2))
+            if len(en_dict) > 500000:
+                # create new dictionary if it has more than 100000 entries
+                old_dicts.append(en_dict)
+                en_dict = dict()
+
+            print("{} lines processed, num_dict={}, dict_size={}".format(cnt, len(old_dicts), len(en_dict)))
+
+        if cnt > 3160000000:
+            break
+
+size = len(en_dict)
+for old_dict in old_dicts:
+    size += len(old_dict)
+    en_dict.update(old_dict)
+
+print('Pre-merged dict size {}'.format(size))
+print('Final dict size {}'.format(len(en_dict)))
+
+with io.TextIOWrapper(open('../data/freebase/dict.txt', 'wb')) as f:
+    for key, value in en_dict.items():
+        f.write("{}\t{}\n".format(key, value))
+
+

@@ -173,7 +173,7 @@ def train(train_x, train_y, conf, save_path):
         sess.run(tf.global_variables_initializer())
 
         merged_summary = tf.summary.merge_all()
-        summary_writer = tf.summary.FileWriter('./logs/%s' % (save_path), graph=sess.graph)
+        summary_writer = tf.summary.FileWriter('./logs/%s' % (save_path), graph=tf.get_default_graph())
         assert_op = tf.group(*tf.get_collection('Asserts'))  # collect all assert ops from collection name 'Asserts'
 
         saver = tf.train.Saver()
@@ -218,6 +218,8 @@ def train(train_x, train_y, conf, save_path):
                         os.makedirs(save_path)
                     saver.save(sess, save_path, global_step=step)
                     logger.info("Model saved at step {}".format(step))
+
+        summary_writer.close()
 
 
 def main(_):
