@@ -4,11 +4,20 @@ Script for extracting entities from Freebase dump.
 
 import io
 import gzip
+import redis
+
+META_DB = 0
+HOST = 'localhost'
+PORT = 6379
 
 cnt = 0
-en_dict = dict()
 
-old_dicts = list()
+metadb = redis.Redis(host=HOST, db=META_DB, port=PORT, decode_responses=True)
+NAME2ID = metadb.get('name2id_db_no')
+ID2NAME = metadb.get('id2name_db_no')
+
+name2id_db = redis.Redis(host=HOST, db=NAME2ID, port=PORT, decode_responses=True)
+id2name_db = redis.Redis(host=HOST, db=ID2NAME, port=PORT, decode_responses=True)
 
 with io.TextIOWrapper(gzip.open("../data/freebase/freebase-rdf-latest.gz", "r")) as freebase:
     for line in freebase:
@@ -20,32 +29,14 @@ with io.TextIOWrapper(gzip.open("../data/freebase/freebase-rdf-latest.gz", "r"))
                 if "@en" in name:
                     name = name.replace("@en", "")
                     name = name.replace("\"", "")
-                    en_dict[name] = mid
+
+                    # insert into dbs
+                    name2id_db.set(name, mid)
+                    id2name_db.set(mid, name)
 
         cnt += 1
 
         if cnt % 10000000 == 0:
 
-            if len(en_dict) > 500000:
-                # create new dictionary if it has more than 100000 entries
-                old_dicts.append(en_dict)
-                en_dict = dict()
-
-            print("{} lines processed, num_dict={}, dict_size={}".format(cnt, len(old_dicts), len(en_dict)))
-
-        if cnt > 3160000000:
-            break
-
-size = len(en_dict)
-for old_dict in old_dicts:
-    size += len(old_dict)
-    en_dict.update(old_dict)
-
-print('Pre-merged dict size {}'.format(size))
-print('Final dict size {}'.format(len(en_dict)))
-
-with io.TextIOWrapper(open('../data/freebase/dict.txt', 'wb')) as f:
-    for key, value in en_dict.items():
-        f.write("{}\t{}\n".format(key, value))
-
+            print("{} lines processed, dict_size={}".format(cnt, name2id_db.dbsize()))
 

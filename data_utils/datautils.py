@@ -1,7 +1,10 @@
-from collections import defaultdict
-from scipy.sparse import csc_matrix
+""" Utils for the corpus generation """
+import logging
 
+DELIM = '_'
 IGNORE_NER_TAG = ('O', 'DATE', 'NUMBER', 'ORDINAL')  # Non-NER tag
+
+logger = logging.getLogger(__name__)
 
 
 def extract_ners(tokens):
@@ -11,7 +14,7 @@ def extract_ners(tokens):
     :return: list of tuple with list of tokens and corresponding tag
     """
     ners = list()
-    new_tokens = list()
+    merged_tokens = list()
 
     candid_entity = list()
     keep = False
@@ -21,24 +24,34 @@ def extract_ners(tokens):
         if keep:
             if tag not in IGNORE_NER_TAG:
                 if prev_tag == tag:
+                    # keep adding ner
                     candid_entity.append(token)
                     keep = True
                 else:
+                    # new ner, prev was also different type of ner
+                    merged_tokens.append(DELIM.join(candid_entity))
                     ners.append((candid_entity, prev_tag))
                     candid_entity = list()
                     candid_entity.append(token)
                     keep = True
             else:
+                # ner ends in prev step
+                merged_tokens.append(DELIM.join(candid_entity))
+                merged_tokens.append(token)
                 ners.append((candid_entity, prev_tag))
                 keep = False
         else:
             if tag not in IGNORE_NER_TAG:
+                # new ner
                 candid_entity = list()
                 candid_entity.append(token)
                 keep = True
+            else:
+                # not ner token
+                merged_tokens.append(token)
         prev_tag = tag
 
-    return ners
+    return ners, merged_tokens
 
 
 def lookup_freebase(ner, en_dict):
@@ -55,11 +68,11 @@ def load_freebase_entity(path="../data/freebase/dict.txt"):
     Load freebase entity dictionary from saved dict
     :return:
     """
-    print('Loading freebase entity dictionary...')
+    logger.info('Loading freebase entity dictionary...')
 
     name2id = dict()
     id2name = dict()
-    with open(path, 'r', buffering=1024*1024*100) as f:
+    with open(path, 'r', buffering=1024 * 1024 * 100) as f:
         for line in f:
             tokens = line.split('\t')
             _name = tokens[0].strip()
@@ -67,9 +80,41 @@ def load_freebase_entity(path="../data/freebase/dict.txt"):
             name2id[_name] = _id
             id2name[_id] = _name
 
-    print('Successfully loaded {} entities from file'.format(len(name2id)))
+    logger.info('Successfully loaded {} entities from file'.format(len(name2id)))
 
     return name2id, id2name
+
+
+def get_nerpos(tokens, ner):
+    """
+    Return position of ner in list of tokens
+
+    :param tokens: list of strs
+    :param ner: str
+    :return: list, 0-indexed position of ner
+    """
+
+    loc = list()
+    for i, token in enumerate(tokens):
+        if token == ner:
+            loc.append(i)
+    return loc
+
+
+def get_nerspos(tokens, ners):
+    """
+    Return positions of ners in list of tokens
+
+    :param tokens:
+    :param ners:
+    :return:
+    """
+    pos_list = list()
+    for ner in ners:
+        pos = get_nerpos(tokens, ner)
+        pos_list.append(pos)
+
+    return pos_list
 
 
 if __name__ == '__main__':
