@@ -1,0 +1,12 @@
+
+DELIM = '_'
+
+METADB = 0
+NAME2ID = 1
+ID2NAME = 2
+WIKI_NER = 3
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+
+IGNORE_NER_TAG = ('O', 'DATE', 'NUMBER', 'ORDINAL')  # Non-NER tag

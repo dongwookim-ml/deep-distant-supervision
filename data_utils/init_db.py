@@ -1,12 +1,13 @@
 import redis
+import data_utils
 
-METADB = 0
-NAME2ID = 1
-ID2NAME = 2
-WIKI_NER = 3
+METADB = data_utils.METADB
+NAME2ID = data_utils.NAME2ID
+ID2NAME = data_utils.METADB
+WIKI_NER = data_utils.WIKI_NER
 
-HOST = 'localhost'
-PORT = 6379
+HOST = data_utils.REDIS_HOST
+PORT = data_utils.REDIS_PORT
 
 metadb = redis.Redis(host=HOST, db=METADB, port=PORT, decode_responses=True)
 metadb.set('name2id_db_no', NAME2ID)
