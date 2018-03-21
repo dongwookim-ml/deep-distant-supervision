@@ -1,8 +1,7 @@
 """ Utils for the corpus generation """
 import logging
-
-DELIM = '_'
-IGNORE_NER_TAG = ('O', 'DATE', 'NUMBER', 'ORDINAL')  # Non-NER tag
+from data_utils import DELIM
+from data_utils import IGNORE_NER_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -23,22 +22,13 @@ def extract_ners(tokens):
     for i, (token, tag) in enumerate(tokens):
         if keep:
             if tag not in IGNORE_NER_TAG:
-                if prev_tag == tag:
-                    # keep adding ner
-                    candid_entity.append(token)
-                    keep = True
-                else:
-                    # new ner, prev was also different type of ner
-                    merged_tokens.append(DELIM.join(candid_entity))
-                    ners.append((candid_entity, prev_tag))
-                    candid_entity = list()
-                    candid_entity.append(token)
-                    keep = True
+                candid_entity.append(token)
+                keep = True
             else:
                 # ner ends in prev step
                 merged_tokens.append(DELIM.join(candid_entity))
                 merged_tokens.append(token)
-                ners.append((candid_entity, prev_tag))
+                ners.append((DELIM.join(candid_entity), prev_tag))
                 keep = False
         else:
             if tag not in IGNORE_NER_TAG:
@@ -54,13 +44,17 @@ def extract_ners(tokens):
     return ners, merged_tokens
 
 
-def lookup_freebase(ner, en_dict):
+def lookup_freebase(ner, rdb):
     """
-    Return existence of ner from Freebase entity dictionary
-    :param ner:
+    Search NER in freebase
+    :param ner: str, ner or entity
+    :param rdb: Redis database
     :return:
+    Return freebase_id (starting with m.) of ner from Freebase entity dictionary,
+    otherwise return None.
     """
-    pass
+
+    return rdb.get(ner)
 
 
 def load_freebase_entity(path="../data/freebase/dict.txt"):
