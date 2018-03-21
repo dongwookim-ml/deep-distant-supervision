@@ -1,17 +1,24 @@
 """
 Script to parse fb15k file
 """
-import os
-import data_utils
-import itertools
-import wikipedia
+import os, sys
+import logging
 from collections import defaultdict
-from nltk.tag.stanford import CoreNLPNERTagger
+
+# Logger
+logger = logging.getLogger()
+logger.handlers = []
+ch = logging.StreamHandler(sys.stdout)
+ch.setFormatter(logging.Formatter('%(name)s:%(levelname)s:%(asctime)s:%(message)s'))
+logger.addHandler(ch)
+logger.setLevel('INFO')
 
 fb15k_path = '../data/FB15k-237.2/'
 train_file = 'train.txt'
 valid_file = 'valid.txt'
 test_file = 'test.txt'
+
+DELIM = '_'
 
 
 def read_triples(file):
@@ -59,47 +66,6 @@ if __name__ == '__main__':
 
     all_triples, fb15k_en_dict, fb15k_rel_dict = merge_triples([tr_triple, val_triple, t_triple])
 
-    print('# of entities in fb15k: {}'.format(len(fb15k_en_dict)))
-    print('# of relations in fb15k: {}'.format(len(fb15k_rel_dict)))
-
-    name2id, id2name = data_utils.load_freebase_entity()
-
-    fb15k_id2name = dict()
-    fb15k_name2id = dict()
-
-    not_in_fb = 0
-    for key in fb15k_en_dict.keys():
-        if key in id2name:
-            fb15k_id2name[key] = id2name[key]
-            fb15k_name2id[id2name[key]] = key
-        else:
-            not_in_fb += 1
-
-    print('{} entities of fb15k are not in Freebase'.format(not_in_fb))
-
-    server_url = 'http://localhost:9000'  # Stanford corenlp server address
-    stream = wikipedia.iter_wiki()
-    tagger = CoreNLPNERTagger(url=server_url)
-    # for title, tokens in itertools.islice(stream, 10):
-    for title, tokens in stream:
-        try:
-            tagged_text = tagger.tag(tokens)
-            ners = data_utils.extract_ners(tagged_text)
-
-            cnt = 0
-            valid_ners = list()
-            for ner in ners:
-                name = ' '.join(ner[0])
-                if name in fb15k_name2id:
-                    print('NER in FB', name)
-                    valid_ners.append(name)
-                    cnt += 1
-
-            if cnt > 2:
-                # there are more than 2 entities in this sentence.
-                print(' '.join(tokens))
-                print(valid_ners)
-
-        except:
-            pass
+    logger.info('# of entities in fb15k: {}'.format(len(fb15k_en_dict)))
+    logger.info('# of relations in fb15k: {}'.format(len(fb15k_rel_dict)))
 
