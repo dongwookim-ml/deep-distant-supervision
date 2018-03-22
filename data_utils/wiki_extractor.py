@@ -3,6 +3,7 @@ from data_utils import *
 import itertools
 import logging
 import redis
+import json
 from nltk.tag.stanford import CoreNLPNERTagger
 import concurrent.futures as confu
 
@@ -23,7 +24,7 @@ def extract_ners(tokens, tagger, rdb):
     :param tagger: NER tagger return list of tokens with corresponding NER tags
     :param rdb: redis database which contains name2id
     :return: if there are more than two freebase entities in the sentence, then return list of tokens and ners.
-    each ner is joined by DELIM.
+    each ner is again a list of tokens.
     """
     try:
         tagged_text = tagger.tag(tokens)
@@ -35,7 +36,7 @@ def extract_ners(tokens, tagger, rdb):
 
     valid_ners = list()
     for ner in ners:
-        if lookup_freebase(ner, rdb) is not None:
+        if lookup_fb(ner, rdb) is not None:
             if ner not in valid_ners:
                 valid_ners.append(ner)
 
@@ -66,19 +67,19 @@ def update_db(rdb, en1, en2, en1pos, en2pos, tokens):
     Update database to add a sentence along with the position of two entities in the sentence.
 
     :param rdb: Redis DB containing wiki sentence
-    :param en1: The first entity
-    :param en2: The second entity
+    :param en1: list, The first entity
+    :param en2: list, The second entity
     :param en1pos: The position of the first entity in the list of tokens
     :param en2pos: The position of the second entity in the list of tokens
-    :param tokens: List of tokens
+    :param tokens: list of tokens
     :return:
     """
-    key = (en1, en2)
-    cnt = rdb.hincrby(key, "cnt")
+    key = encode_rds((en1, en2))
+    cnt = rdb.hincrby(key, "cnt")  # the number of sentences for this key
 
     rdb.hset(key, (cnt, "en1pos"), en1pos)
     rdb.hset(key, (cnt, "en2pos"), en2pos)
-    rdb.hset(key, (cnt, "sentence"), ' '.join(tokens))
+    rdb.hset(key, (cnt, "sentence"), encode_rds(tokens))
 
 
 if __name__ == '__main__':

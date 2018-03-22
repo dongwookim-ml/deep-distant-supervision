@@ -10,6 +10,10 @@ HOST = data_utils.REDIS_HOST
 PORT = data_utils.REDIS_PORT
 
 metadb = redis.Redis(host=HOST, db=METADB, port=PORT, decode_responses=True)
-metadb.set('name2id_db_no', NAME2ID)
-metadb.set('id2name_db_no', ID2NAME)
-metadb.set('wiki_ner_db_no', WIKI_NER)
+metadb.flushall()
+
+metadb.set('db:name2id', NAME2ID)
+metadb.set('db:id2name', ID2NAME)
+metadb.set('db:wiki_ner', WIKI_NER)
+metadb.set('db:id2uid', WIKI_NER)
+

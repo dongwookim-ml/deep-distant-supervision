@@ -1,10 +1,8 @@
-
-DELIM = '_'
-
 METADB = 0
 NAME2ID = 1
 ID2NAME = 2
 WIKI_NER = 3
+ID2UID = 4
 
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
