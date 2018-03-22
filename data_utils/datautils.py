@@ -1,10 +1,16 @@
 """ Utils for the corpus generation """
 import logging
-from data_utils import DELIM
+import json
 from data_utils import IGNORE_NER_TAG
 
 logger = logging.getLogger(__name__)
 
+
+def encode_rds(obj):
+    return json.dumps(obj)
+
+def decode_rds(obj):
+    return json.loads(obj)
 
 def extract_ners(tokens):
     """
@@ -26,9 +32,9 @@ def extract_ners(tokens):
                 keep = True
             else:
                 # ner ends in prev step
-                merged_tokens.append(DELIM.join(candid_entity))
+                merged_tokens.append(candid_entity)
                 merged_tokens.append(token)
-                ners.append((DELIM.join(candid_entity), prev_tag))
+                ners.append((candid_entity, prev_tag))
                 keep = False
         else:
             if tag not in IGNORE_NER_TAG:
@@ -44,17 +50,18 @@ def extract_ners(tokens):
     return ners, merged_tokens
 
 
-def lookup_freebase(ner, rdb):
+def lookup_fb(ner, rdb):
     """
     Search NER in freebase
-    :param ner: str, ner or entity
+    :param ner: str or list of str
     :param rdb: Redis database
     :return:
     Return freebase_id (starting with m.) of ner from Freebase entity dictionary,
     otherwise return None.
     """
-
-    return rdb.get(ner)
+    if type(ner) == type(str):
+        return rdb.get(ner)
+    return rdb.get(' '.join(ner))
 
 
 def load_freebase_entity(path="../data/freebase/dict.txt"):
@@ -83,8 +90,8 @@ def get_nerpos(tokens, ner):
     """
     Return position of ner in list of tokens
 
-    :param tokens: list of strs
-    :param ner: str
+    :param tokens: list of tokens
+    :param ner: list of tokens
     :return: list, 0-indexed position of ner
     """
 
