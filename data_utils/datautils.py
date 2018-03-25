@@ -59,7 +59,7 @@ def lookup_fb(ner, rdb):
     Return freebase_id (starting with m.) of ner from Freebase entity dictionary,
     otherwise return None.
     """
-    if type(ner) == type(str):
+    if type(ner) == str:
         return rdb.get(ner)
     return rdb.get(' '.join(ner))
 
