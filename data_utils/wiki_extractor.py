@@ -132,7 +132,7 @@ if __name__ == '__main__':
                 if i % 100 == 0:
                     logger.info('{} lines processed'.format(i))
 
-                if i < _skip:
+                if i > _skip:
                     meta_db.set('stat:wiki_parsed', i)
 
         except Exception as e:
