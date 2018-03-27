@@ -9,8 +9,10 @@ logger = logging.getLogger(__name__)
 def encode_rds(obj):
     return json.dumps(obj)
 
+
 def decode_rds(obj):
     return json.loads(obj)
+
 
 def extract_ners(tokens):
     """
@@ -48,20 +50,6 @@ def extract_ners(tokens):
         prev_tag = tag
 
     return ners, merged_tokens
-
-
-def lookup_fb(ner, rdb):
-    """
-    Search NER in freebase
-    :param ner: str or list of str
-    :param rdb: Redis database
-    :return:
-    Return freebase_id (starting with m.) of ner from Freebase entity dictionary,
-    otherwise return None.
-    """
-    if type(ner) == str:
-        return rdb.get(ner)
-    return rdb.get(' '.join(ner))
 
 
 def load_freebase_entity(path="../data/freebase/dict.txt"):

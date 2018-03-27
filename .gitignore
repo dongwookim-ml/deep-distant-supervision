@@ -12,6 +12,7 @@ samples
 
 # wikipedia data
 *.bz2
+*.gz
 
 # FB15K data
 FB15K-237.2/
