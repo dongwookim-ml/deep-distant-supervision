@@ -70,7 +70,7 @@ def process_sentence(tokens, ners, ner_id):
     num_ner = len(ner_pos)
     for first_ner, second_ner in itertools.product(range(num_ner - 1), range(1, num_ner)):
         for pos1, pos2 in itertools.product(ner_pos[first_ner], ner_pos[second_ner]):
-            yield (ner_id[first_ner], ner_id[second_ner], ners[first_ner], ners[second_ner], pos1, pos2, sid)
+            yield (ner_id[first_ner], ner_id[second_ner], pos1, pos2, sid)
 
 
 if __name__ == '__main__':
@@ -102,9 +102,8 @@ if __name__ == '__main__':
                             ner_id = result[2]
                             logger.info('Sentence {}'.format(tokens))
                             logger.info('NERS {}'.format(ners))
-                            for en1id, en2id, en1, en2, en1pos, en2pos, sid in process_sentence(tokens, ners,
-                                                                                                ner_id):
-                                db_helper.add_pair(en1id, en2id, en1, en2, en1pos, en2pos, sid)
+                            for en1id, en2id, en1pos, en2pos, sid in process_sentence(tokens, ners, ner_id):
+                                db_helper.add_pair(en1id, en2id, en1pos, en2pos, sid)
 
                     token_list = list()
 
