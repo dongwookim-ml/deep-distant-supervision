@@ -1,5 +1,8 @@
 """
 Script for extracting entities from Freebase dump.
+Save (surface-form, freebase-id) in name2id database.
+Save (freebase-id, surface-form) in id2name database.
+Both db use Redis
 """
 
 import io
@@ -7,8 +10,10 @@ import gzip
 import redis
 from data_utils import *
 
+
 def get_fb_entities():
     cnt = 0
+
     name2id_db = redis.Redis(host=REDIS_HOST, db=NAME2ID, port=REDIS_PORT, decode_responses=True)
     id2name_db = redis.Redis(host=REDIS_HOST, db=ID2NAME, port=REDIS_PORT, decode_responses=True)
 
@@ -25,10 +30,10 @@ def get_fb_entities():
 
                         name2id_db.set(name, mid)
                         id2name_db.set(mid, name)
+
             cnt += 1
 
             if cnt % 10000000 == 0:
-
                 print("{} lines processed, dict_size={}".format(cnt, name2id_db.dbsize()))
 
 
