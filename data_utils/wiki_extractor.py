@@ -49,7 +49,8 @@ def extract_ners(tokens, tagger):
                 valid_ners.append(ner[0])
                 valid_ner_id.append(rval)
 
-    if len(valid_ners) >= 2:
+    if 2 <= len(valid_ners) <= 4:
+        # we only take into account the sentences with a few number of entities
         return merged_tokens, valid_ners, valid_ner_id
 
     return None
