@@ -70,7 +70,7 @@ def add_sentence(sentence, ners=None, ner_pos=None):
 
 def add_pair(en1id, en2id, en1pos, en2pos, sid):
     """
-    Add an entity pair into db
+    Add an entity pair into db, and increase the pair counter
     :param en1id: freebase id of the first entity
     :param en2id: freebase id of the second entity
     :param en1pos: the position of the first entity in the sentence[sid]
@@ -98,5 +98,9 @@ def lookup_sentence(sid):
 
 
 if __name__ == '__main__':
-    print('Total sentence parsed : {}'.format(sentence_collection.count()))
-    print('Total number of entity pairs: {}'.format(pair_count.count()))
+    while True:
+        import time
+        print('Total sentence parsed : {}'.format(sentence_collection.count()))
+        print('Total number of entity pairs: {}'.format(pair_count.count()))
+        time.sleep(60)
+
