@@ -12,7 +12,8 @@ MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
 
 MG_FB = 'wiki-freebase'
-MG_FBDICT = 'fb_dict'
+MG_FB_REL_DICT = 'fb_relation_dict'
+
 MG_WIKI_DB = 'wikipedia'
 MG_SENTENCE_COL = 'sentence_col'
 MG_PAIR_COL = 'pair_col'
