@@ -5,7 +5,8 @@ Utils for enumerating Wikipedia corpus
 import json
 import logging
 import itertools
-import data_utils
+from config import *
+from datautils import extract_ners
 from gensim.utils import smart_open
 
 from nltk.tag.stanford import CoreNLPNERTagger
@@ -34,7 +35,7 @@ def iter_wiki(dump_file=raw_path):
         for section in article['section_texts']:
             for sentence in sent_tokenize(section):
                 tokens = word_tokenize(sentence)
-                if len(tokens) > data_utils.MIN_SENTENCE_LENGTH:
+                if len(tokens) > MIN_SENTENCE_LENGTH:
                     yield title, tokens
 
 
@@ -44,4 +45,4 @@ if __name__ == '__main__':
     for title, tokens in itertools.islice(stream, 8):
         tagged_text = tagger.tag(tokens)
         print(title, tagged_text)
-        data_utils.extract_ners(tagged_text)
+        extract_ners(tagged_text)

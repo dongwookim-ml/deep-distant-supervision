@@ -3,7 +3,7 @@ Database operations
 """
 import redis
 import pymongo
-from data_utils import *
+from config import *
 
 # connect to mongodb
 client = pymongo.MongoClient(MONGO_HOST, MONGO_PORT)
