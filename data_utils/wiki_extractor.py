@@ -6,8 +6,9 @@ MongoDB is used to store extracted sentences and entities
 
 """
 import sys, traceback
-from data_utils import *
-from data_utils import db_helper
+from datautils import extract_ners, get_nerspos
+from wikipedia import iter_wiki
+from db_helper import add_sentence, add_pair, lookup_fb, get_wiki_parsed_stat, set_wiki_parsed_cnt
 import itertools
 import logging
 from nltk.tag.stanford import CoreNLPNERTagger
@@ -37,19 +38,20 @@ def extract_ners(tokens, tagger):
         logger.info('NER error {}'.format(len(tokens)))
         return None
 
-    ners, merged_tokens = datautils.extract_ners(tagged_text)
+    ners, merged_tokens = extract_ners(tagged_text)
 
     valid_ners = list()
     valid_ner_id = list()
     for ner in ners:
         # ner = ((tokens), tag)
-        rval = db_helper.lookup_fb(ner[0])
+        rval = lookup_fb(ner[0])
         if rval is not None:
             if ner[0] not in valid_ners:
                 valid_ners.append(ner[0])
                 valid_ner_id.append(rval)
 
-    if len(valid_ners) >= 2:
+    if 2 <= len(valid_ners) <= 4:
+        # we only take into account the sentences with a few number of entities
         return merged_tokens, valid_ners, valid_ner_id
 
     return None
@@ -63,25 +65,25 @@ def process_sentence(tokens, ners, ner_id):
     :param ners: list of ners in the token list
     :param ner_id: list of freebase id for each ner
     """
-    ner_pos = datautils.get_nerspos(tokens, ners)
+    ner_pos = get_nerspos(tokens, ners)
 
-    sid = db_helper.add_sentence(tokens, ners, ner_pos)
+    sid = add_sentence(tokens, ners, ner_pos)
 
     num_ner = len(ner_pos)
     for first_ner, second_ner in itertools.product(range(num_ner - 1), range(1, num_ner)):
         for pos1, pos2 in itertools.product(ner_pos[first_ner], ner_pos[second_ner]):
-            yield (ner_id[first_ner], ner_id[second_ner], ners[first_ner], ners[second_ner], pos1, pos2, sid)
+            yield (ner_id[first_ner], ner_id[second_ner], pos1, pos2, sid)
 
 
 if __name__ == '__main__':
     num_thread = 8
     server_url = 'http://localhost:9000'  # Stanford corenlp server address
-    stream = wikipedia.iter_wiki()
+    stream = iter_wiki()
     tagger = CoreNLPNERTagger(url=server_url)
 
     token_list = list()
 
-    _skip = db_helper.get_wiki_parsed_stat()
+    _skip = get_wiki_parsed_stat()
 
     with confu.ThreadPoolExecutor(num_thread) as executor:
         try:
@@ -102,9 +104,8 @@ if __name__ == '__main__':
                             ner_id = result[2]
                             logger.info('Sentence {}'.format(tokens))
                             logger.info('NERS {}'.format(ners))
-                            for en1id, en2id, en1, en2, en1pos, en2pos, sid in process_sentence(tokens, ners,
-                                                                                                ner_id):
-                                db_helper.add_pair(en1id, en2id, en1, en2, en1pos, en2pos, sid)
+                            for en1id, en2id, en1pos, en2pos, sid in process_sentence(tokens, ners, ner_id):
+                                add_pair(en1id, en2id, en1pos, en2pos, sid)
 
                     token_list = list()
 
@@ -112,14 +113,14 @@ if __name__ == '__main__':
                     logger.info('{} lines processed'.format(i))
 
                 if i > _skip:
-                    db_helper.set_wiki_parsed_cnt(i)
+                    set_wiki_parsed_cnt(i)
 
         except KeyboardInterrupt:
             traceback.print_exc(file=sys.stdout)
-            db_helper.set_wiki_parsed_cnt(i)
+            set_wiki_parsed_cnt(i)
             sys.exit(0)
 
         except Exception as e:
             print(e)
             traceback.print_exc(file=sys.stdout)
-            db_helper.set_wiki_parsed_cnt(i)
+            set_wiki_parsed_cnt(i)

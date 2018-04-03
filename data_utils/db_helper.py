@@ -3,14 +3,14 @@ Database operations
 """
 import redis
 import pymongo
-from data_utils import *
+from config import *
 
 # connect to mongodb
 client = pymongo.MongoClient(MONGO_HOST, MONGO_PORT)
-db = client[MG_WIKI_DB]
-sentence_collection = db[MG_SENTENCE_COL]
-pair_collection = db[MG_PAIR_COL]
-pair_count = db[MG_PAIR_CNT]
+mongo_db = client[MG_WIKI_DB]
+sentence_collection = mongo_db[MG_SENTENCE_COL]
+pair_collection = mongo_db[MG_PAIR_COL]
+pair_count = mongo_db[MG_PAIR_CNT]
 
 meta_db = redis.Redis(host=REDIS_HOST, db=METADB, port=REDIS_PORT, decode_responses=True)
 # surface name to freebase id
@@ -43,9 +43,11 @@ def lookup_fb(ner):
     Return freebase_id (starting with m.) of ner from Freebase entity dictionary,
     otherwise return None.
     """
-    if type(ner) == str:
+    if isinstance(ner, str):
         return name2id_db.get(ner)
-    return name2id_db.get(' '.join(ner))
+    elif isinstance(ner, list):
+        return name2id_db.get(' '.join(ner))
+    return None
 
 
 def add_sentence(sentence, ners=None, ner_pos=None):
@@ -66,13 +68,11 @@ def add_sentence(sentence, ners=None, ner_pos=None):
     return sentence_collection.insert_one(post).inserted_id
 
 
-def add_pair(en1id, en2id, en1, en2, en1pos, en2pos, sid):
+def add_pair(en1id, en2id, en1pos, en2pos, sid):
     """
-    Add an entity pair into db
+    Add an entity pair into db, and increase the pair counter
     :param en1id: freebase id of the first entity
     :param en2id: freebase id of the second entity
-    :param en1: list, list of tokens of the first entity
-    :param en2: list, list of tokens of the second entity
     :param en1pos: the position of the first entity in the sentence[sid]
     :param en2pos: the position of the second entity in the sentence[sid]
     :param sid: unique sentence id
@@ -80,8 +80,6 @@ def add_pair(en1id, en2id, en1, en2, en1pos, en2pos, sid):
     """
     post = {'en1id': en1id,
             'en2id': en2id,
-            'en1': en1,
-            'en2': en2,
             'en1pos': en1pos,
             'en2pos': en2pos,
             'sid': sid
@@ -97,3 +95,12 @@ def lookup_sentence(sid):
     :return: Return sentence (list of tokens)
     """
     return sentence_collection.find({"_id": sid})
+
+
+if __name__ == '__main__':
+    while True:
+        import time
+        print('Total sentence parsed : {}'.format(sentence_collection.count()))
+        print('Total number of entity pairs: {}'.format(pair_count.count()))
+        time.sleep(60)
+
