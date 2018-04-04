@@ -90,6 +90,8 @@ if __name__ == '__main__':
             for i, (title, tokens) in enumerate(stream):
                 if i < _skip:
                     continue
+                elif i == _skip:
+                    logger.info('{} Lines are passed'.format(i))
 
                 token_list.append(tokens)
 
@@ -102,8 +104,8 @@ if __name__ == '__main__':
                             tokens = result[0]
                             ners = result[1]
                             ner_id = result[2]
-                            logger.info('Sentence {}'.format(tokens))
-                            logger.info('NERS {}'.format(ners))
+                            logger.debug('Sentence {}'.format(tokens))
+                            logger.debug('NERS {}'.format(ners))
                             for en1id, en2id, en1pos, en2pos, sid in process_sentence(tokens, ners, ner_id):
                                 add_pair(en1id, en2id, en1pos, en2pos, sid)
 
@@ -112,8 +114,7 @@ if __name__ == '__main__':
                 if i % 1000 == 0:
                     logger.info('{} lines processed'.format(i))
 
-                if i > _skip:
-                    set_wiki_parsed_cnt(i)
+                set_wiki_parsed_cnt(i)
 
         except KeyboardInterrupt:
             traceback.print_exc(file=sys.stdout)

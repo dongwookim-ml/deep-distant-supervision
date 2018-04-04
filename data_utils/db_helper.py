@@ -12,6 +12,9 @@ sentence_collection = mongo_db[MG_SENTENCE_COL]
 pair_collection = mongo_db[MG_PAIR_COL]
 pair_count = mongo_db[MG_PAIR_CNT]
 
+fb_db = client[MG_FB_DB]
+relation_collection = fb_db[MG_REL_COL]
+
 meta_db = redis.Redis(host=REDIS_HOST, db=METADB, port=REDIS_PORT, decode_responses=True)
 # surface name to freebase id
 name2id_db = redis.Redis(host=REDIS_HOST, db=NAME2ID, port=REDIS_PORT, decode_responses=True)
