@@ -11,8 +11,8 @@ REDIS_PORT = 6379
 MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
 
-MG_FB = 'wiki-freebase'
-MG_FB_REL_DICT = 'fb_relation_dict'
+MG_FB_DB = 'freebase'
+MG_REL_COL = 'fb_relation_col'
 
 MG_WIKI_DB = 'wikipedia'
 MG_SENTENCE_COL = 'sentence_col'
@@ -21,5 +21,5 @@ MG_PAIR_CNT = 'pair_cnt'
 
 IGNORE_NER_TAG = ('O', 'DATE', 'NUMBER', 'ORDINAL', 'PERCENT', 'MONEY', 'DURATION')  # Non-NER tag
 
-
 MIN_SENTENCE_LENGTH = 20
+
