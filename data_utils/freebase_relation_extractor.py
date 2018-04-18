@@ -9,7 +9,6 @@ import logging
 from db_helper import relation_collection
 
 logger = logging.getLogger(__name__)
-logger.setLevel('DEBUG')
 
 
 def get_fb_relations():
@@ -29,7 +28,6 @@ def get_fb_relations():
                         }
                 relation_collection.update_one(post, {'$inc': {'cnt': 1}}, upsert=True)
                 logger.debug('En1 {}, En2 {}, Rel {}'.format(en1, en2, rel))
-                print('En1 {}, En2 {}, Rel {}'.format(en1, en2, rel))
 
             cnt += 1
 

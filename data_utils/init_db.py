@@ -3,7 +3,7 @@ Initialise databases
 """
 import pymongo
 import data_utils
-from .db_helper import meta_db, pair_collection, pair_count, mongo_db
+from db_helper import meta_db, pair_collection, pair_count, mongo_db, relation_collection
 
 # Redis
 
@@ -18,13 +18,15 @@ PORT = data_utils.REDIS_PORT
 
 meta_db.set('db:name2id', NAME2ID)
 meta_db.set('db:id2name', ID2NAME)
-meta_db.set('stat:wiki_parsed', 0)
+# meta_db.set('stat:wiki_parsed', 0)    # set parsing counter to 0
 
-# MongoDB
-mongo_db.drop_collection(data_utils.MG_SENTENCE_COL)
-mongo_db.drop_collection(data_utils.MG_PAIR_COL)
-mongo_db.drop_collection(data_utils.MG_PAIR_CNT)
+# MongoDB initialise (remove all existing collections)
+# mongo_db.drop_collection(data_utils.MG_SENTENCE_COL)
+# mongo_db.drop_collection(data_utils.MG_PAIR_COL)
+# mongo_db.drop_collection(data_utils.MG_PAIR_CNT)
 
 pair_collection.create_index([('en1id', pymongo.ASCENDING), ('en2id', pymongo.ASCENDING)])
 pair_count.create_index([('en1id', pymongo.ASCENDING), ('en2id', pymongo.ASCENDING)], unique=True)
+
+relation_collection.create_index([('en1id', pymongo.ASCENDING), ('en2id', pymongo.ASCENDING)])
 
