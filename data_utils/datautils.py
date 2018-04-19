@@ -1,7 +1,7 @@
 """ Utils for the corpus generation """
 import logging
 import json
-from data_utils import IGNORE_NER_TAG
+from config import IGNORE_NER_TAG
 
 logger = logging.getLogger(__name__)
 
