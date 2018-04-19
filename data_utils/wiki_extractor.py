@@ -6,7 +6,7 @@ MongoDB is used to store extracted sentences and entities
 
 """
 import sys, traceback
-from datautils import extract_ners, get_nerspos
+from datautils import merge_ners, get_nerspos
 from wikipedia import iter_wiki
 from db_helper import add_sentence, add_pair, lookup_fb, get_wiki_parsed_stat, set_wiki_parsed_cnt
 import itertools
@@ -38,7 +38,7 @@ def extract_ners(tokens, tagger):
         logger.info('NER error {}'.format(len(tokens)))
         return None
 
-    ners, merged_tokens = extract_ners(tagged_text)
+    ners, merged_tokens = merge_ners(tagged_text)
 
     valid_ners = list()
     valid_ner_id = list()
