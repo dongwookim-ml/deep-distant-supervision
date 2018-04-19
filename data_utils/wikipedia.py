@@ -27,7 +27,7 @@ def iter_wiki(dump_file=raw_path):
     """
     ignore_namespaces = 'Wikipedia Category File Portal Template MediaWiki User Help Book Draft'.split()
     for line in smart_open(dump_file):
-        article = json.loads(line)
+        article = json.loads(line.decode('utf-8'))
 
         title = article['title']
         if any(title.startswith(ns + ':') for ns in ignore_namespaces):
