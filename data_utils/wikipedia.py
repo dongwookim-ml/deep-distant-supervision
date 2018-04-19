@@ -6,7 +6,7 @@ import json
 import logging
 import itertools
 from config import *
-from datautils import extract_ners
+from datautils import merge_ners
 from gensim.utils import smart_open
 
 from nltk.tag.stanford import CoreNLPNERTagger
@@ -45,4 +45,4 @@ if __name__ == '__main__':
     for title, tokens in itertools.islice(stream, 8):
         tagged_text = tagger.tag(tokens)
         print(title, tagged_text)
-        extract_ners(tagged_text)
+        merge_ners(tagged_text)

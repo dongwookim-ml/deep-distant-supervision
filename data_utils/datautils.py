@@ -14,7 +14,7 @@ def decode_rds(obj):
     return json.loads(obj)
 
 
-def extract_ners(tokens):
+def merge_ners(tokens):
     """
     Extract consecutive ners from the result of CoreNLPNERTagger
     :param tokens: list of tuple with token and tag
