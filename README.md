@@ -6,7 +6,7 @@ Distant supervision algorithms with neural network.
 ## Training
 To train the deep-distant supervision model, try
 
-`python main.py --is_train=True --num_hidden=256 --data_set=data/nyt --num_poch=3 --save_gap=1000 --print_gap=100`
+`python main.py --is_train=True --num_hidden=256 --data_set=nyt --num_poch=3 --save_gap=1000 --print_gap=100`
 
 Examples of some configurable model parameters are:
 - `word_attn`: boolean, whether to use word-level attention layer
@@ -21,21 +21,16 @@ To see the all possible configurations, try
 `python main.py --help`
 
 ### Data format
-`train_x.npy` and `train_y.npy` are preprocessed training data. These files should be in the data folder set by `data_set` parameter.
-
-`train_x.npy` contains a `list` of triples, where each triple consists of a `list` of sentences.
-
-A sentence is a list of tuples with `(token_id, pos_en1, pos_en2)`
-- `token_id`: ID of word token in a dictionary
-- `pos_en1`': relative position of the token to entity 1
-- `pos_en2`': relative position of the token to entity 2
-
-`train_y.npy` contains a list of one-hot vectors for triples. The order of triples is the same as `train_x.npy`.
+The model requires input file, predefined set of relations, and precomputed word-embedding vectors.
+Take a look at the following files for the required input format:
+- `data/nyt/train.txt`: each line consists of (entity1_id, entity2_id, entity1_surface_form, entity2_surface_form, relation, sentence)
+- `data/nyt/relation2id`: list of relations with their ids
+- `data/word2vec.txt`: each line consists of (word_token embedding_vector)
 
 ## Testing
 To test the trained model, try
 
-`python main.py --is_train=False --data_set=data/nyt`
+`python main.py --is_train=False --data_set=nyt`
 
 # Requirements
 - Tensorflow 1.2
