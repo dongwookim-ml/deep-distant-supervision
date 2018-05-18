@@ -6,7 +6,7 @@ import json
 import logging
 import itertools
 from config import *
-from datautils import merge_ners
+from .datautils import merge_ners
 from gensim.utils import smart_open
 
 from nltk.tag.stanford import CoreNLPNERTagger

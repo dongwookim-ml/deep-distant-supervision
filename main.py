@@ -4,9 +4,10 @@ import os
 import sys
 import tensorflow as tf
 import numpy as np
+import data_fetcher
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, average_precision_score
-from utils import get_model_dir, unstack_next_batch, unstack_data
+from utils import get_model_dir, unstack_next_batch
 
 flags = tf.app.flags
 
@@ -18,7 +19,7 @@ flags.DEFINE_integer('num_filter', 32, 'The number of filter in cnn (if network_
 flags.DEFINE_integer('pos_dim', 5, 'The dimensionality of position embedding')
 flags.DEFINE_boolean('bidirectional', True, 'Whether to define bidirectional rnn')
 flags.DEFINE_integer('num_relation', 53, 'The number of relations to be classified')
-flags.DEFINE_integer('max_position', 123, 'The upper bound on relative position')
+flags.DEFINE_integer('max_position', 141, 'The upper bound on relative position')
 flags.DEFINE_integer('len_sentence', 70, 'The upper bound on sentence length')
 flags.DEFINE_integer('num_layer', 1, 'The number of hidden layers, default=1')
 flags.DEFINE_boolean('dropout', True, 'If true, apply dropout layer after rnn layer')
@@ -29,15 +30,14 @@ flags.DEFINE_string('network_type', 'rnn', 'Model type [rnn, cnn]')
 # Training
 flags.DEFINE_boolean('is_train', True, 'Whether to do training or testing')
 flags.DEFINE_boolean('load_prev', True, 'Restore previously trained model if True')
-flags.DEFINE_integer('batch_size', 48,
-                     'The size of batch for minibatch training (number of triples to be mini-batched)')
+flags.DEFINE_integer('batch_size', 4, 'The number of triples to be mini-batched')
 flags.DEFINE_boolean('pretrained_w2v', True,
                      'Use pretrained word2vec if True, note that the word id should be aligned with the word2vec id')
 flags.DEFINE_string('w2v_path', 'data/vec.npy', 'Path to the pretrained word2vec')
 flags.DEFINE_integer('num_epoch', 3, 'The number of epochs used for training')
 flags.DEFINE_integer('max_batch_sentences', 1500, 'The maximum number of sentences to be batched for each triple')
-flags.DEFINE_string('dataset', 'data/nyt', 'path to the dataset')
-flags.DEFINE_integer('print_gap', 50, 'Print status every print_gap iteration')
+flags.DEFINE_string('dataset', 'nyt', 'path to the dataset')
+flags.DEFINE_integer('print_gap', 100, 'Print status every print_gap iteration')
 flags.DEFINE_integer('save_gap', 1000, 'Save model every save_gap iteration to save_path')
 flags.DEFINE_boolean('train_validation', True, 'If true, training includes validation as well')
 
@@ -81,7 +81,7 @@ logger.addHandler(ch)
 logger.setLevel(conf.log_level)
 
 
-def test(test_x, test_y, conf, save_path):
+def test(embedding, rel2id, triple, sen_col, conf, save_path):
     """
     Compute precision at conf.top_n and roc-auc score given trained model with test set
 
@@ -90,16 +90,10 @@ def test(test_x, test_y, conf, save_path):
     :param conf: configuration
     :param save_path: path to the saved model
     """
-    test_x, test_y = unstack_data(test_x, test_y, conf.max_batch_sentences)
-    num_triples = len(test_x)  # total number of triples to be trained
-
-    batch_size = conf.batch_size
-    while num_triples % batch_size:
-        # there should be no remainder
-        batch_size += 1
+    num_triples = len(triple)
+    batch_size = 1
     conf.batch_size = batch_size
 
-    total_batch = int(num_triples / float(batch_size))
 
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -108,8 +102,7 @@ def test(test_x, test_y, conf, save_path):
 
         with tf.variable_scope("model", reuse=None):
             if conf.pretrained_w2v:
-                word_embedding = np.load(conf.w2v_path)
-                nre = model.NRE(conf, word_embedding)
+                nre = model.NRE(conf, embedding)
             else:
                 nre = model.NRE(conf)
 
@@ -126,12 +119,13 @@ def test(test_x, test_y, conf, save_path):
         saver.restore(sess, ckpt)
         logger.info("Last Session Restored")
 
-        all_prob = np.zeros([num_triples, conf.num_relation])
-        for i in tqdm(range(total_batch)):
-            batch_x = test_x[i * batch_size:min((i + 1) * batch_size, num_triples)]
-            batch_y = test_y[i * batch_size:min((i + 1) * batch_size, num_triples)]
+        target_y = list()
 
-            feed_dict = unstack_next_batch(nre, batch_x, batch_y)
+        fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
+        all_prob = np.zeros([num_triples, conf.num_relation])
+        for i in tqdm(range(num_triples)):
+            feed_dict = unstack_next_batch(model, fetcher, conf)
+            target_y.append(feed_dict[model.input_y][0])
 
             prob, loss, accuracy, l2_loss, final_loss = sess.run(
                 [nre.prob, nre.total_loss, nre.accuracy, nre.l2_loss,
@@ -140,7 +134,8 @@ def test(test_x, test_y, conf, save_path):
             all_prob[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)] = prob
 
         target_prob = np.reshape(all_prob[:, 1:], (-1))  # note that the relation of the first column is NA
-        target_y = np.reshape(test_y[:, 1:], (-1))
+        target_y = np.array(target_y)
+        target_y = np.reshape(target_y[:, 1:], (-1))
         ordered_idx = np.argsort(-target_prob)
         top_n = eval(conf.top_n)
         prec_at_n = np.zeros(len(top_n))
@@ -154,7 +149,7 @@ def test(test_x, test_y, conf, save_path):
         logger.info("Average Precision:{:g}".format(ap))
 
 
-def train(train_x, train_y, conf, save_path):
+def train(embedding, rel2id, triple, sen_col, conf, save_path):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
@@ -163,8 +158,7 @@ def train(train_x, train_y, conf, save_path):
 
         with tf.variable_scope("model", reuse=None, initializer=initializer):
             if conf.pretrained_w2v:
-                word_embedding = np.load(conf.w2v_path)
-                nre = model.NRE(conf, word_embedding)
+                nre = model.NRE(conf, embedding)
             else:
                 nre = model.NRE(conf)
 
@@ -191,21 +185,16 @@ def train(train_x, train_y, conf, save_path):
             # print trainable variables and their shapes
             logger.debug("Trainable variable: {}\tShape: {}".format(k, v.shape))
 
-        train_x, train_y = unstack_data(train_x, train_y, conf.max_batch_sentences)
-        num_triples = len(train_x)  # total number of triples to be trained
+        num_triples = len(triple)  # total number of triples to be trained
 
         for one_epoch in range(conf.num_epoch):
             # randomly shuffle index of training set
-            random_ordered_idx = np.arange(num_triples)
-            np.random.shuffle(random_ordered_idx)
             total_batch = int(num_triples / float(conf.batch_size))  # note that the final one batch will not be used
+            fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
 
             for i in tqdm(range(total_batch), initial=total_batch * one_epoch, total=total_batch * conf.num_epoch):
-                random_idx = random_ordered_idx[i * conf.batch_size: min((i + 1) * conf.batch_size, num_triples)]
-                batch_x = train_x[random_idx]
-                batch_y = train_y[random_idx]
 
-                feed_dict = unstack_next_batch(nre, batch_x, batch_y)
+                feed_dict = unstack_next_batch(nre, fetcher, conf)
 
                 temp, step, loss, accuracy, summary, l2_loss, final_loss, _ = sess.run(
                     [train_op, global_step, nre.total_loss, nre.accuracy, merged_summary, nre.l2_loss,
@@ -233,18 +222,16 @@ def main(_):
         save_path = conf.save_path
     logger.info("Model path {}".format(save_path))
 
-    if conf.is_train and conf.train_validation:
-        train_x = np.load(dataset + '/train_x.npy')
-        train_y = np.load(dataset + '/train_y.npy')
-        train(train_x, train_y, conf, save_path)
-    elif conf.is_train:
-        train_x = np.load(dataset + '/train_x.npy')
-        train_y = np.load(dataset + '/train_y.npy')
-        train(train_x, train_y, conf, save_path)
-    else:
-        test_x = np.load(dataset + '/test_x.npy')
-        test_y = np.load(dataset + '/test_y.npy')
-        test(test_x, test_y, conf, save_path)
+    if dataset == 'nyt':
+        word2id, embedding = data_fetcher.load_w2v('./data/word2vec.txt')
+        rel2id = data_fetcher.load_relations('./data/nyt/relation2id.txt', True)
+        if conf.is_train:
+            triple, sen_col = data_fetcher.loadnyt('./data/nyt/train.txt', word2id)
+            train(embedding, rel2id, triple, sen_col, conf, save_path)
+        else:
+            triple, sen_col = data_fetcher.loadnyt('./data/nyt/test.txt', word2id)
+            test(embedding, rel2id, triple, sen_col, conf, save_path)
+
 
 if __name__ == '__main__':
     tf.app.run()

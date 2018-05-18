@@ -3,7 +3,7 @@ Initialise databases
 """
 import pymongo
 import data_utils
-from db_helper import meta_db, pair_collection, pair_count, mongo_db, relation_collection
+from .db_helper import meta_db, pair_collection, pair_count, mongo_db, relation_collection
 
 # Redis
 
