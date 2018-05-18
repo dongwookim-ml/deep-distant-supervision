@@ -2,8 +2,6 @@
 logs
 
 # data
-data/nyt
-data/word2vec.txt
 samples
 *checkpoints/
 #*.npy
