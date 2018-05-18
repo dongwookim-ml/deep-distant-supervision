@@ -33,7 +33,7 @@ flags.DEFINE_boolean('load_prev', True, 'Restore previously trained model if Tru
 flags.DEFINE_integer('batch_size', 4, 'The number of triples to be mini-batched')
 flags.DEFINE_boolean('pretrained_w2v', True,
                      'Use pretrained word2vec if True, note that the word id should be aligned with the word2vec id')
-flags.DEFINE_string('w2v_path', 'data/vec.npy', 'Path to the pretrained word2vec')
+flags.DEFINE_string('w2v_path', 'data/word2vec.txt', 'Path to the pretrained word2vec')
 flags.DEFINE_integer('num_epoch', 3, 'The number of epochs used for training')
 flags.DEFINE_integer('max_batch_sentences', 1500, 'The maximum number of sentences to be batched for each triple')
 flags.DEFINE_string('dataset', 'nyt', 'path to the dataset')
