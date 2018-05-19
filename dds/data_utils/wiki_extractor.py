@@ -6,9 +6,9 @@ MongoDB is used to store extracted sentences and entities
 
 """
 import sys, traceback
-from datautils import merge_ners, get_nerspos
-from wikipedia import iter_wiki
-from .db_helper import add_sentence, add_pair, lookup_fb, get_wiki_parsed_stat, set_wiki_parsed_cnt
+from dds.data_utils.datautils import merge_ners, get_nerspos
+from dds.data_utils.wikipedia import iter_wiki
+from dds.data_utils.db_helper import add_sentence, add_pair, lookup_fb, get_wiki_parsed_stat, set_wiki_parsed_cnt
 import itertools
 import logging
 from nltk.tag.stanford import CoreNLPNERTagger

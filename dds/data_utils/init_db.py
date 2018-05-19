@@ -2,8 +2,8 @@
 Initialise databases
 """
 import pymongo
-import data_utils
-from .db_helper import meta_db, pair_collection, pair_count, mongo_db, relation_collection
+from dds import data_utils
+from dds.data_utils.db_helper import meta_db, pair_collection, pair_count, mongo_db, relation_collection
 
 # Redis
 

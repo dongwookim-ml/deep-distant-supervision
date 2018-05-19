@@ -8,7 +8,7 @@ Both db use Redis
 import io
 import gzip
 import redis
-from .config import *
+from dds.data_utils.config import *
 
 def get_fb_entities():
     cnt = 0
