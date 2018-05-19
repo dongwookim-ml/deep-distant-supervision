@@ -127,7 +127,9 @@ def loadnyt(datapath, word2id):
     sen_col = defaultdict(list)
     with open(datapath, 'r') as f:
         for line in f:
-            en1id, en2id, en1token, en2token, rel, sen = line.split('\t')
+            tokens = line.split('\t')
+            # the number of tokens are not the same for train.txt and test.txt, cannot unpack directly from split
+            en1id, en2id, en1token, en2token, rel, sen = tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]
 
             # add relation
             triples[(en1id, en2id)].add(rel)

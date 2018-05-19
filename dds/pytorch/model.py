@@ -4,6 +4,9 @@ import torch.nn.functional as F
 
 
 class Attention(nn.Module):
+    """
+    Simple attention layer
+    """
     def __init__(self, input_dim):
         super(Attention, self).__init__()
         self.w1 = nn.Parameter(torch.randn(input_dim, requires_grad=True))
