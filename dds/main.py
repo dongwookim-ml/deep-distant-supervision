@@ -1,13 +1,12 @@
 import logging
-import model
 import os
 import sys
 import tensorflow as tf
 import numpy as np
-import data_fetcher
+from dds import data_fetcher, model
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, average_precision_score
-from utils import get_model_dir, unstack_next_batch
+from dds.utils import get_model_dir, unstack_next_batch
 
 flags = tf.app.flags
 

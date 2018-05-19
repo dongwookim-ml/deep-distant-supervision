@@ -27,6 +27,9 @@ def get_model_dir(config, exceptions=('help', 'helpfull', 'helpshort')):
 
 
 def unstack_next_batch(model, fetcher, conf):
+    """
+    Obtain training data point from fetcher and construct feed dict
+    """
     batch_size = conf.batch_size
     max_sen = conf.max_batch_sentences
     cumsum_sentences = 0
@@ -38,7 +41,15 @@ def unstack_next_batch(model, fetcher, conf):
 
     for i in range(batch_size):
         triple_index[i] = cumsum_sentences
-        x, y = next(fetcher)
+
+        try:
+            x, y = next(fetcher)
+        except StopIteration:
+            tmp_index = np.zeros(i+1)
+            tmp_index[:i] = triple_index[:i]
+            triple_index = tmp_index
+            break
+
         if len(x) > max_sen:
             np.random.shuffle(x)
             x = x[:max_sen]
@@ -47,6 +58,7 @@ def unstack_next_batch(model, fetcher, conf):
             pos2 = list(pos2)
             if len(sen) < conf.len_sentence:
                 for padding in range(conf.len_sentence - len(sen)):
+                    # padding sentence and position vectors for static computational graph model with fixed sentence len
                     sen.append(0)
                     pos1.append(pos1[-1]+1)
                     pos2.append(pos2[-1]+1)
