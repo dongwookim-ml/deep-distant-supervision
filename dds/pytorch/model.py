@@ -31,36 +31,38 @@ class DDS(nn.Module):
         output = self.linear(sen_embedding)
         return output
 
-input_dim = 4
-hidden_dim = 3
-num_layers = 2
-batch_size = 2
-seq_len = 5
-num_relations = 52
 
-model = DDS(input_dim, hidden_dim, num_layers, num_relations)
-optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
-loss_fn = nn.BCEWithLogitsLoss()
+if __name__ == '__main__':
+    input_dim = 4
+    hidden_dim = 3
+    num_layers = 2
+    batch_size = 2
+    seq_len = 5
+    num_relations = 52
 
-input = torch.randn(batch_size, seq_len, input_dim, requires_grad=False)
-output = model(input)
+    model = DDS(input_dim, hidden_dim, num_layers, num_relations)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
+    loss_fn = nn.BCEWithLogitsLoss()
 
-# random output generation
-y1= torch.LongTensor(batch_size, 1).random_() % num_relations
-y2= torch.LongTensor(batch_size, 1).random_() % num_relations
-y_onehot = torch.empty(batch_size, num_relations, requires_grad=False)
-y_onehot.zero_()
-y_onehot.scatter_(1, y1, 1)
-y_onehot.scatter_(1, y2, 1)
+    input = torch.randn(batch_size, seq_len, input_dim, requires_grad=False)
+    output = model(input)
 
-loss = loss_fn(output, y_onehot)
-print('Loss', loss)
+    # random output generation
+    y1= torch.LongTensor(batch_size, 1).random_() % num_relations
+    y2= torch.LongTensor(batch_size, 1).random_() % num_relations
+    y_onehot = torch.empty(batch_size, num_relations, requires_grad=False)
+    y_onehot.zero_()
+    y_onehot.scatter_(1, y1, 1)
+    y_onehot.scatter_(1, y2, 1)
 
-optimizer.zero_grad()
-loss.backward()
-optimizer.step()
+    loss = loss_fn(output, y_onehot)
+    print('Loss', loss)
 
-for name, param in model.named_parameters():
-    if param.requires_grad:
-        print(name, param.size())
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(name, param.size())
 

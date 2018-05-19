@@ -223,13 +223,13 @@ def main(_):
     logger.info("Model path {}".format(save_path))
 
     if dataset == 'nyt':
-        word2id, embedding = data_fetcher.load_w2v('./data/word2vec.txt')
-        rel2id = data_fetcher.load_relations('./data/nyt/relation2id.txt', True)
+        word2id, embedding = data_fetcher.load_w2v('../data/word2vec.txt')
+        rel2id = data_fetcher.load_relations('../data/nyt/relation2id.txt', True)
         if conf.is_train:
-            triple, sen_col = data_fetcher.loadnyt('./data/nyt/train.txt', word2id)
+            triple, sen_col = data_fetcher.loadnyt('../data/nyt/train.txt', word2id)
             train(embedding, rel2id, triple, sen_col, conf, save_path)
         else:
-            triple, sen_col = data_fetcher.loadnyt('./data/nyt/test.txt', word2id)
+            triple, sen_col = data_fetcher.loadnyt('../data/nyt/test.txt', word2id)
             test(embedding, rel2id, triple, sen_col, conf, save_path)
 
 

@@ -6,7 +6,7 @@ Use mongodb to index the extracted relations
 import io
 import gzip
 import logging
-from .db_helper import relation_collection, pair_collection
+from dds.data_utils.db_helper import relation_collection, pair_collection
 
 logger = logging.getLogger(__name__)
 

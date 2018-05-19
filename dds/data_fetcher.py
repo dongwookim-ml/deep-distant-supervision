@@ -72,7 +72,7 @@ def sentence2id(sentence, word2id):
 
 
 def fetch_sentences_wiki(word2id, rel2id):
-    from data_utils.db_helper import pair_collection, pair_count, relation_collection, sentence_collection
+    from dds.data_utils.db_helper import pair_collection, pair_count, relation_collection, sentence_collection
 
     # retrieve entity pairs from beginning to end
     # cur = pair_count.find()
