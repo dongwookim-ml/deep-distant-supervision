@@ -192,8 +192,9 @@ def train(embedding, rel2id, triple, sen_col, conf, save_path):
             fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
 
             for i in tqdm(range(total_batch), initial=total_batch * one_epoch, total=total_batch * conf.num_epoch):
-
                 feed_dict = unstack_next_batch(nre, fetcher, conf)
+                if feed_dict is None:
+                    continue
 
                 temp, step, loss, accuracy, summary, l2_loss, final_loss, _ = sess.run(
                     [train_op, global_step, nre.total_loss, nre.accuracy, merged_summary, nre.l2_loss,

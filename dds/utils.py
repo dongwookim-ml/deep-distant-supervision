@@ -45,10 +45,7 @@ def unstack_next_batch(model, fetcher, conf):
         try:
             x, y = next(fetcher)
         except StopIteration:
-            tmp_index = np.zeros(i+1)
-            tmp_index[:i] = triple_index[:i]
-            triple_index = tmp_index
-            break
+            return None
 
         if len(x) > max_sen:
             np.random.shuffle(x)
