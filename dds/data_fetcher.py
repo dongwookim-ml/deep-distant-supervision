@@ -156,7 +156,7 @@ def loadnyt(datapath, word2id):
     return triples, sen_col
 
 
-def fetch_sentences_nyt(triples, sen_col, rel2id):
+def fetch_sentences_nyt(triples, sen_col, rel2id, is_shuffle=True):
     """
     Generate batch of sentences from a randomly sampled entity pair
     :param triples: dictionary, key=(en1id, en2id), value=(rel1, rel2, ...)
@@ -165,7 +165,8 @@ def fetch_sentences_nyt(triples, sen_col, rel2id):
     :return:
     """
     keys = list(triples.keys())
-    np.random.shuffle(keys)
+    if is_shuffle:
+        np.random.shuffle(keys)
     num_rel = len(rel2id)
     for key in keys:
         x = list()
@@ -178,6 +179,7 @@ def fetch_sentences_nyt(triples, sen_col, rel2id):
         sentences = sen_col[key]
         for sen2tid, en1pos, en2pos in sentences:
             sen_len = len(sen2tid)
+            sen2tid = np.array(sen2tid)
             pos1vec = np.arange(max_sen_len - en1pos, max_sen_len - en1pos + sen_len)
             pos2vec = np.arange(max_sen_len - en2pos, max_sen_len - en2pos + sen_len)
             x.append((sen2tid, pos1vec, pos2vec))

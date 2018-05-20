@@ -51,6 +51,7 @@ def unstack_next_batch(model, fetcher, conf):
             np.random.shuffle(x)
             x = x[:max_sen]
         for sen, pos1, pos2 in x:
+            sen = list(sen)
             pos1 = list(pos1)
             pos2 = list(pos2)
             if len(sen) < conf.len_sentence:
