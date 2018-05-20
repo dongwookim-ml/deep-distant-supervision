@@ -23,7 +23,7 @@ class SentenceAttention(nn.Module):
     def forward(self, input):
         # shape (batch, hidden_dim) * (hidden_dim, 1) -> (1, hidden_dim)
         attn = torch.einsum('ik,k->i', [input, self.w1])
-        norm_attn = F.softmax(attn).clone()
+        norm_attn = F.softmax(attn, 0).clone()
         summary = torch.einsum("ik,i->k", [input, norm_attn])
         return summary
 
@@ -114,7 +114,6 @@ if __name__ == '__main__':
     for i, (x, y) in enumerate(tqdm(fetcher, total=len(triple))):
         x = sorted(x, key=lambda x: len(x[0]))
         x.reverse()
-        print([len(k[0]) for k in x])
         _y = torch.from_numpy(y).float()
 
         output = model(x)
