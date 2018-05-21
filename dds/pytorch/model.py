@@ -50,12 +50,18 @@ class DDS(nn.Module):
     Deep distant supervision model
     """
 
-    def __init__(self, embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, embed):
+    def __init__(self, embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, embed=None):
         logger.info('Initialize DDS model')
         super(DDS, self).__init__()
-        if type(embed) == np.ndarray:
+
+        if embed is not None and type(embed) == np.ndarray:
             embed = torch.from_numpy(embed)
-        self.w2v = nn.Embedding(num_embeddings=num_voca, embedding_dim=embed_dim, _weight=embed)
+
+        if embed is not None:
+            self.w2v = nn.Embedding(num_embeddings=num_voca, embedding_dim=embed_dim, _weight=embed)
+        else:
+            self.w2v = nn.Embedding(num_embeddings=num_voca, embedding_dim=embed_dim)
+
         self.pos1vec = nn.Embedding(num_voca, pos_dim)
         self.pos2vec = nn.Embedding(num_voca, pos_dim)
         self.input_dim = embed_dim + 2 * pos_dim
@@ -88,6 +94,8 @@ class DDS(nn.Module):
 
 
 if __name__ == '__main__':
+    from sklearn.metrics import roc_auc_score, average_precision_score
+
     logger.info('Loading word2vec')
     word2id, embedding = data_fetcher.load_w2v('../../data/word2vec.txt')
     logger.info('... Done')
@@ -98,6 +106,10 @@ if __name__ == '__main__':
     triple, sen_col = data_fetcher.loadnyt('../../data/nyt/train.txt', word2id)
     logger.info('... Done')
     fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
+
+    logger.info('Loading test dataset')
+    test_triple, test_sen_col = data_fetcher.loadnyt('../../data/nyt/test.txt', word2id)
+    logger.info('... Done')
 
     embed_dim = 50
     hidden_dim = 32
@@ -111,7 +123,8 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=1e-4)
     loss_fn = nn.BCEWithLogitsLoss()
 
-    for i, (x, y) in enumerate(tqdm(fetcher, total=len(triple))):
+    # for i, (x, y) in enumerate(tqdm(fetcher, total=len(triple))):
+    for i, (x, y) in enumerate(fetcher):
         x = sorted(x, key=lambda x: len(x[0]))
         x.reverse()
         _y = torch.from_numpy(y).float()
@@ -123,6 +136,32 @@ if __name__ == '__main__':
         optimizer.step()
 
         logger.debug('%d Done, loss = %f' % (i, loss))
+        if i % 10000 == 0 and i != 0:
+            test_fetcher = data_fetcher.fetch_sentences_nyt(test_triple, test_sen_col, rel2id)
+            all_y = list()
+            all_predicted_y = list()
+            for x, y in tqdm(test_fetcher, total=len(test_triple)):
+                x = sorted(x, key=lambda x: len(x[0]))
+                x.reverse()
 
-        if i % 10000 == 0:
-            logger.info('%d entity pairs are processed' % i)
+                output = model(x)
+                predicted_y = output.data.numpy()
+                all_y.append(y)
+                all_predicted_y.append(predicted_y)
+
+            all_prob = np.array(all_predicted_y)
+            target_y = np.array(all_y)
+            target_prob = np.reshape(all_prob[:, 1:], (-1))  # note that the relation of the first column is NA
+            target_y = np.array(target_y)
+            target_y = np.reshape(target_y[:, 1:], (-1))
+            ordered_idx = np.argsort(-target_prob)
+            top_n = [100, 200, 300]
+            prec_at_n = np.zeros(len(top_n))
+            for k, top_k in enumerate(top_n):
+                prec_at_n[k] = np.sum(target_y[ordered_idx][:top_k], dtype=float) / float(top_k)
+                logger.info("Precision @ {}:{:g}".format(top_k, prec_at_n[k]))
+
+            roc_auc = roc_auc_score(target_y, target_prob)
+            logger.info("ROC-AUC score:{:g}".format(roc_auc))
+            ap = average_precision_score(target_y, target_prob)
+            logger.info("Average Precision:{:g}".format(ap))

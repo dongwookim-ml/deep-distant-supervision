@@ -16,7 +16,7 @@ def get_fb_entities():
     name2id_db = redis.Redis(host=REDIS_HOST, db=NAME2ID, port=REDIS_PORT, decode_responses=True)
     id2name_db = redis.Redis(host=REDIS_HOST, db=ID2NAME, port=REDIS_PORT, decode_responses=True)
 
-    with io.TextIOWrapper(gzip.open("../data/freebase/freebase-rdf-latest.gz", "r")) as freebase:
+    with io.TextIOWrapper(gzip.open("../../data/freebase/freebase-rdf-latest.gz", "r")) as freebase:
         for line in freebase:
             if "type.object.name" in line:
                 tokens = line.split('\t')

@@ -16,8 +16,8 @@ logging.basicConfig(format='%(levelname)s : %(message)s', level=logging.INFO)
 logging.root.level = logging.INFO  # ipython sometimes messes up the logging setup; restore
 
 # run `python -m gensim.scripts.segment_wiki -i -f enwiki-20180301-pages-articles.xml.bz2 -o enwiki.json.gz`
-# raw_path = "../data/wikipedia/enwiki-20180301-pages-articles.xml.bz2"
-raw_path = "../data/wikipedia/enwiki.json.gz"
+# raw_path = "../../data/wikipedia/enwiki-20180301-pages-articles.xml.bz2"
+raw_path = "../../data/wikipedia/enwiki.json.gz"
 server_url = 'http://localhost:9000'  # Stanford corenlp server address
 
 

@@ -13,7 +13,7 @@ ch.setFormatter(logging.Formatter('%(name)s:%(levelname)s:%(asctime)s:%(message)
 logger.addHandler(ch)
 logger.setLevel('INFO')
 
-fb15k_path = '../data/FB15k-237.2/'
+fb15k_path = '../../data/FB15k-237.2/'
 train_file = 'train.txt'
 valid_file = 'valid.txt'
 test_file = 'test.txt'

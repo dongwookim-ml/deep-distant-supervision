@@ -6,7 +6,7 @@ Use mongodb to index the extracted relations
 import io
 import gzip
 import logging
-from dds.data_utils.db_helper import relation_collection, pair_collection
+from dds.data_utils.db_helper import relation_collection, pair_collection, id2name_db
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,20 @@ def get_fb_relations():
 def retrieve_db():
     cur = relation_collection.find()
     relations = set()
-    for record in cur:
-        relations.add(record['rel'])
 
-    with open('../data/freebase/relations.txt') as f:
+    with open('../../data/freebase/triples.txt', 'w') as f:
+        for record in cur:
+            relations.add(record['rel'])
+
+            en1id = record['en1id']
+            en2id = record['en2id']
+            rel = record['rel']
+            en1name = id2name_db.get(en1id)
+            en2name = id2name_db.get(en2id)
+            f.write('%s\t%s\t%s\t%s\t%s\n' % (en1id, en2id, en1name, en2name, rel))
+            print('%s\t%s\t%s\t%s\t%s\n' % (en1id, en2id, en1name, en2name, rel))
+
+    with open('../../data/freebase/relations.txt', 'w') as f:
         f.write('NA\n')
         for rel in relations:
             f.write('%s\n' % (rel))
@@ -53,5 +63,6 @@ def retrieve_db():
 
 
 if __name__ == '__main__':
-    get_fb_relations()
+    # get_fb_relations()
     retrieve_db()
+
