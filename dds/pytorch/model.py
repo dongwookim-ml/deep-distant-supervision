@@ -5,7 +5,7 @@ import sys
 import logging
 import numpy as np
 from tqdm import tqdm
-from dds import data_fetcher
+from dds.data_fetcher import NYTFetcher
 
 # Logger
 ch = logging.StreamHandler(sys.stdout)
@@ -110,11 +110,12 @@ class DDS(nn.Module):
         return self.output_linear(hidden_output)
 
 
-def evaluation(all_prob, target_y):
-    target_prob = np.reshape(all_prob[:, 1:], (-1))  # note that the relation of the first column is NA
+def evaluation(prob_y, target_y):
+    target_prob = np.reshape(prob_y[:, 1:], (-1))  # note that the relation of the first column is NA
     target_y = np.array(target_y)
     target_y = np.reshape(target_y[:, 1:], (-1))
     ordered_idx = np.argsort(-target_prob)
+    logger.info('Total validation count %d', np.sum(target_y))
     top_n = [100, 200, 300]
     prec_at_n = np.zeros(len(top_n))
     for k, top_k in enumerate(top_n):
@@ -147,17 +148,13 @@ def test(test_data, model, loss_fn):
 if __name__ == '__main__':
     from sklearn.metrics import roc_auc_score, average_precision_score
 
-    logger.info('Loading word2vec')
-    word2id, embedding = data_fetcher.load_w2v('../../data/word2vec.txt')
-    logger.info('... Done')
-    logger.info('Loading relations')
-    rel2id = data_fetcher.load_relations('../../data/nyt/relation2id.txt', True)
-    logger.info('... Done')
-    logger.info('Loading dataset')
-    triple, sen_col = data_fetcher.loadnyt('../../data/nyt/train.txt', word2id)
-    logger.info('... Done')
-
     embed_dim = 50
+    logger.info('Loading Fetcher')
+    w2v_path = '../../data/word2vec.txt'
+    rel_path = '../../data/nyt/relation2id.txt'
+    sen_path = '../../data/nyt/train.txt'
+    fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+
     hidden_dim = 128
     num_valid = 500
     valid_cycle = 1000
@@ -165,10 +162,10 @@ if __name__ == '__main__':
     seq_len = 70
     pos_dim = 5
     num_epoch = 3
-    num_voca = len(word2id)
-    num_relations = len(rel2id)
+    num_voca = len(fetcher.word2id)
+    num_relations = len(fetcher.rel2id)
 
-    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, embedding)
+    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, fetcher.word_embedding)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     loss_fn = nn.BCEWithLogitsLoss()
 
@@ -177,14 +174,15 @@ if __name__ == '__main__':
             logger.debug('Param %s : %s', name, param.shape)
 
     for epoch in range(num_epoch):
-        fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
+        fetcher.reset()
 
         valid_data = list()
         for i in range(num_valid):
             x, y = next(fetcher)
             valid_data.append((x, y))
 
-        for i, (x, y) in enumerate(tqdm(fetcher, initial=epoch*len(triple), total=(len(triple)-num_valid)*num_epoch)):
+        for i, (x, y) in enumerate(
+                tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
             _y = torch.from_numpy(y).float()
 
             optimizer.zero_grad()
@@ -198,9 +196,6 @@ if __name__ == '__main__':
             if i % valid_cycle == 0:
                 test(valid_data, model, loss_fn)
 
-    logger.info('Loading test dataset')
-    test_triple, test_sen_col = data_fetcher.loadnyt('../../data/nyt/test.txt', word2id)
-    logger.info('... Done')
-
-    test_fetcher = data_fetcher.fetch_sentences_nyt(test_triple, test_sen_col, rel2id)
+    test_path = '../../data/nyt/test.txt'
+    test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
     test(test_fetcher, model, loss_fn)

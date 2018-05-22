@@ -3,7 +3,8 @@ import os
 import sys
 import tensorflow as tf
 import numpy as np
-from dds import data_fetcher, model
+from dds import model
+from dds.data_fetcher import NYTFetcher
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, average_precision_score
 from dds.utils import get_model_dir, unstack_next_batch
@@ -80,7 +81,7 @@ logger.addHandler(ch)
 logger.setLevel(conf.log_level)
 
 
-def test(embedding, rel2id, triple, sen_col, conf, save_path):
+def test(fetcher, conf, save_path):
     """
     Compute precision at conf.top_n and roc-auc score given trained model with test set
 
@@ -89,7 +90,7 @@ def test(embedding, rel2id, triple, sen_col, conf, save_path):
     :param conf: configuration
     :param save_path: path to the saved model
     """
-    num_triples = len(triple)
+    num_pairs = fetcher.num_pairs
     batch_size = 1
     conf.batch_size = batch_size
 
@@ -101,7 +102,7 @@ def test(embedding, rel2id, triple, sen_col, conf, save_path):
 
         with tf.variable_scope("model", reuse=None):
             if conf.pretrained_w2v:
-                nre = model.NRE(conf, embedding)
+                nre = model.NRE(conf, fetcher.word_embedding)
             else:
                 nre = model.NRE(conf)
 
@@ -120,9 +121,9 @@ def test(embedding, rel2id, triple, sen_col, conf, save_path):
 
         target_y = list()
 
-        fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
-        all_prob = np.zeros([num_triples, conf.num_relation])
-        for i in tqdm(range(num_triples)):
+        fetcher.reset()
+        all_prob = np.zeros([num_pairs, conf.num_relation])
+        for i in tqdm(range(num_pairs)):
             feed_dict = unstack_next_batch(model, fetcher, conf)
             target_y.append(feed_dict[model.input_y][0])
 
@@ -130,7 +131,7 @@ def test(embedding, rel2id, triple, sen_col, conf, save_path):
                 [nre.prob, nre.total_loss, nre.accuracy, nre.l2_loss,
                  nre.final_loss], feed_dict)
 
-            all_prob[i * conf.batch_size:min((i + 1) * conf.batch_size, num_triples)] = prob
+            all_prob[i * conf.batch_size:min((i + 1) * conf.batch_size, num_pairs)] = prob
 
         target_prob = np.reshape(all_prob[:, 1:], (-1))  # note that the relation of the first column is NA
         target_y = np.array(target_y)
@@ -148,7 +149,7 @@ def test(embedding, rel2id, triple, sen_col, conf, save_path):
         logger.info("Average Precision:{:g}".format(ap))
 
 
-def train(embedding, rel2id, triple, sen_col, conf, save_path):
+def train(fetcher, conf, save_path):
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
 
@@ -157,7 +158,7 @@ def train(embedding, rel2id, triple, sen_col, conf, save_path):
 
         with tf.variable_scope("model", reuse=None, initializer=initializer):
             if conf.pretrained_w2v:
-                nre = model.NRE(conf, embedding)
+                nre = model.NRE(conf, fetcher.word_embedding)
             else:
                 nre = model.NRE(conf)
 
@@ -184,13 +185,12 @@ def train(embedding, rel2id, triple, sen_col, conf, save_path):
             # print trainable variables and their shapes
             logger.debug("Trainable variable: {}\tShape: {}".format(k, v.shape))
 
-        num_triples = len(triple)  # total number of triples to be trained
+        num_pairs = fetcher.num_pairs  # total number of entity pairs to be trained
 
         for one_epoch in range(conf.num_epoch):
             # randomly shuffle index of training set
-            total_batch = int(num_triples / float(conf.batch_size))  # note that the final one batch will not be used
-            fetcher = data_fetcher.fetch_sentences_nyt(triple, sen_col, rel2id)
-
+            total_batch = int(num_pairs / float(conf.batch_size))  # note that the final one batch will not be used
+            fetcher.reset()
             for i in tqdm(range(total_batch), initial=total_batch * one_epoch, total=total_batch * conf.num_epoch):
                 feed_dict = unstack_next_batch(nre, fetcher, conf)
                 if feed_dict is None:
@@ -223,14 +223,19 @@ def main(_):
     logger.info("Model path {}".format(save_path))
 
     if dataset == 'nyt':
-        word2id, embedding = data_fetcher.load_w2v('../data/word2vec.txt')
-        rel2id = data_fetcher.load_relations('../data/nyt/relation2id.txt', True)
+
+        embed_dim = 50
+        logger.info('Loading Fetcher')
+        w2v_path = '../../data/word2vec.txt'
+        rel_path = '../../data/nyt/relation2id.txt'
         if conf.is_train:
-            triple, sen_col = data_fetcher.loadnyt('../data/nyt/train.txt', word2id)
-            train(embedding, rel2id, triple, sen_col, conf, save_path)
+            sen_path = '../../data/nyt/train.txt'
+            fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+            train(fetcher, conf, save_path)
         else:
-            triple, sen_col = data_fetcher.loadnyt('../data/nyt/test.txt', word2id)
-            test(embedding, rel2id, triple, sen_col, conf, save_path)
+            sen_path = '../../data/nyt/test.txt'
+            fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+            test(fetcher, conf, save_path)
 
 
 if __name__ == '__main__':
