@@ -57,7 +57,7 @@ def unstack_next_batch(model, fetcher, conf):
             if len(sen) < conf.len_sentence:
                 for padding in range(conf.len_sentence - len(sen)):
                     # padding sentence and position vectors for static computational graph model with fixed sentence len
-                    sen.append(0)
+                    sen.append(0)  # token 0 is always BLANK token
                     pos1.append(pos1[-1]+1)
                     pos2.append(pos2[-1]+1)
             feed_sentences.append(sen)

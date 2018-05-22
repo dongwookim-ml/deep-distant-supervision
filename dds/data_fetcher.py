@@ -129,7 +129,8 @@ def loadnyt(datapath, word2id):
         for line in f:
             tokens = line.split('\t')
             # the number of tokens are not the same for train.txt and test.txt, cannot unpack directly from split
-            en1id, en2id, en1token, en2token, rel, sen = tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]
+            en1id, en2id, en1token, en2token, rel, sen = tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[
+                5]
 
             # add relation
             triples[(en1id, en2id)].add(rel)
@@ -153,10 +154,16 @@ def loadnyt(datapath, word2id):
                 # add parsed sentence
                 sen_col[(en1id, en2id)].append((sen2tid, en1pos, en2pos))
 
+    for key, value in triples.items():
+        # if entity pair has any relation except 'NA', remove 'NA' from relation set
+        if len(value) > 1:
+            if 'NA' in value:
+                value.remove('NA')
+
     return triples, sen_col
 
 
-def fetch_sentences_nyt(triples, sen_col, rel2id, is_shuffle=True):
+def fetch_sentences_nyt(triples, sen_col, rel2id):
     """
     Generate batch of sentences from a randomly sampled entity pair
     :param triples: dictionary, key=(en1id, en2id), value=(rel1, rel2, ...)
@@ -165,8 +172,8 @@ def fetch_sentences_nyt(triples, sen_col, rel2id, is_shuffle=True):
     :return:
     """
     keys = list(triples.keys())
-    if is_shuffle:
-        np.random.shuffle(keys)
+    # if is_shuffle:
+    #     np.random.shuffle(keys)
     num_rel = len(rel2id)
     for key in keys:
         x = list()
