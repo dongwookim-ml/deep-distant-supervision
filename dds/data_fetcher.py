@@ -1,13 +1,12 @@
 """
-Pytorch version of deep-distant supervision algorithm.
+Data fetcher for deep distant supervision models
 
-What we need as input files:
+DataFetcher is an abstract class handling dataset.
 
-0. Predefined set of relations
-1. Collection of sentences (sentence (tokenized), entity1, entity2, entity1_position, entity2_position
-2. Knowledge graph - query from database. When issue query on pair of entities, db returns the collection of relations
-3. word2vec (or predefined vocabulary) - convert sentences to a list of token ids
-
+Each data point feed into model will consist of
+    (first_entity, second_entity, bag_of_sentences, set_of_possible_relations)
+    - bag_of_sentences: collection of all sentences which contains both first_entity and second_entity
+    - set_of_possible_relations: set of all possible relations between first_entity and second_entity, retrieved from existing knowledge base
 """
 import logging
 from abc import abstractmethod
@@ -82,7 +81,8 @@ class DataFetcher():
                     rel2id[rel] = int(id)
                     id2rel[int(id)] = rel
                 else:
-                    rel2id[line.strip()] = len(rel2id)
+                    # first token of each line will be a relation name
+                    rel2id[line.strip().split()[0]] = len(rel2id)
                     id2rel[len(rel2id) - 1] = line.strip()
         return rel2id, id2rel
 
@@ -91,14 +91,14 @@ class NYTFetcher(DataFetcher):
     def __init__(self, *args, **kwargs):
         super(NYTFetcher, self).__init__(*args, **kwargs)
         logger.info('Loading sentences')
-        self.pairs, self.sen_col = self.load_triple(self.data_path)
+        self.pairs, self.sen_col = self._load_triple(self.data_path)
         self.keys = list(self.pairs.keys())
         self.num_pairs = len(self.pairs)
         if self.is_shuffle:
             np.random.shuffle(self.keys)
         logger.info('Loading fetcher done')
 
-    def load_triple(self, datapath):
+    def _load_triple(self, datapath):
         """
         extract knowledge graph and sentences from nyt dataset
         :return:
@@ -180,6 +180,7 @@ class FreebaseFetcher(DataFetcher):
         from dds.data_utils.db_helper import pair_collection, pair_count, relation_collection, sentence_collection
 
         super(FreebaseFetcher, self).__init__(*args, **kwargs)
+        self.pair_count = pair_count
         self.pair_collection = pair_collection
         self.relation_collection = relation_collection
         self.sentence_collection = sentence_collection
@@ -187,11 +188,8 @@ class FreebaseFetcher(DataFetcher):
         self.cur = pair_count.find()
         self.current_pos = 0
         self.num_pairs = self.pair_collection.count()
-        self.ret_order = np.arange(self.num_pairs)
-        if self.is_shuffle:
-            np.random.shuffle(self.ret_order)
 
-    def sentence2id(self, sentence):
+    def _sentence2id(self, sentence):
         sen2tid = list()  # sentence to list of token ids
         for token in sentence:
             if type(token) == list:
@@ -206,17 +204,20 @@ class FreebaseFetcher(DataFetcher):
                 else:
                     token_id = self.word2id[OOV]
             sen2tid.append(token_id)
-        return sen2tid
+        return np.array(sen2tid)
 
-    def fetch_sentences_wiki(self, word2id, rel2id):
+    def reset(self):
+        self.cur = self.pair_count.find()
+        self.current_pos = 0
+
+    def next(self):
         # retrieve entity pairs from beginning to end
         # random sample from collection of entity pairs
-
         while True:
             if self.current_pos > self.num_pairs:
                 raise StopIteration
 
-            en_pair = self.cur[self.ret_order[self.current_pos]]  # is this efficient enough?
+            en_pair = self.cur[self.current_pos]
             self.current_pos += 1
             # for each entity pair in the dataset
             en1id = en_pair['en1id']
@@ -235,16 +236,20 @@ class FreebaseFetcher(DataFetcher):
                 if sen_len < max_sen_len:
                     pos1vec = np.arange(max_sen_len - en1pos, max_sen_len - en1pos + sen_len)
                     pos2vec = np.arange(max_sen_len - en2pos, max_sen_len - en2pos + sen_len)
-                    sen2tid = self.sentence2id(sen_row['sentence'])
+                    sen2tid = self._sentence2id(sen_row['sentence'])
                     x.append((sen2tid, pos1vec, pos2vec))
 
             rel_cur = self.relation_collection.find(query)
-            y = np.zeros(len(rel2id))
+            y = np.zeros(self.num_rel)
             if rel_cur.count() != 0:
                 for row in rel_cur:
-                    y[rel2id[row['rel']]] = 1
+                    if row['rel'] in self.rel2id:
+                        # we only consider predefined relation
+                        y[self.rel2id[row['rel']]] = 1
+                    else:
+                        y[self.rel2id['NA']] = 1
             else:
-                y[rel2id['NA']] = 1
+                y[self.rel2id['NA']] = 1
 
             if len(x) > 0:
                 return x, y
@@ -256,7 +261,7 @@ if __name__ == '__main__':
         num_train_rel = 0
         num_train_sen = 0
         num_valid_train_sen = 0
-        rel_dict = defaultdict(int)
+        rel_cnt = defaultdict(int)
         for batch_x, batch_y in fetcher:
             num_train_rel += np.sum(batch_y[1:])
             num_train_sen += len(batch_x)
@@ -264,25 +269,25 @@ if __name__ == '__main__':
                 num_valid_train_sen += len(batch_x)
             for i in range(1, fetcher.num_rel):
                 if batch_y[i] == 1:
-                    rel_dict[fetcher.id2rel[i]] = len(batch_x)
-        return num_train_rel, num_train_sen, num_valid_train_sen, rel_dict
+                    rel_cnt[fetcher.id2rel[i]] = len(batch_x)
+        return num_train_rel, num_train_sen, num_valid_train_sen, rel_cnt
 
-    logger.info('Loading Fetcher')
+
     embed_dim = 50
     w2v_path = '../data/word2vec.txt'
     rel_path = '../data/nyt/relation2id.txt'
-    sen_path = '../data/nyt/train.txt'
+    train_path = '../data/nyt/train.txt'
     test_path = '../data/nyt/test.txt'
-    fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+    train_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, train_path)
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
 
-    num_tr, num_ts, num_vts, rel_dict = compute_stats(fetcher)
+    num_tr, num_ts, num_vts, rel_dict = compute_stats(train_fetcher)
     t_num_tr, t_num_ts, t_num_vts, t_rel_dict = compute_stats(test_fetcher)
 
-    print('Number of triples in the training/test set:', num_tr, t_num_tr,)
+    print('Number of triples in the training/test set:', num_tr, t_num_tr)
     print('Number of sentences included in the training/test triples:', num_ts, t_num_ts)
     print('Number of valid sentences (sentences whose relation is not NA) included in the training/test triples:',
           num_vts, t_num_vts)
-    print('Number of training/test setnences for each relation')
+    print('Number of training/test sentences for each relation')
     for key, value in rel_dict.items():
         print('\tRelation %s: %d, %d' % (key, value, t_rel_dict[key]))

@@ -234,7 +234,7 @@ def main(_):
             train(fetcher, conf, save_path)
         else:
             sen_path = '../../data/nyt/test.txt'
-            fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+            fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path, is_shuffle=False)
             test(fetcher, conf, save_path)
 
 
