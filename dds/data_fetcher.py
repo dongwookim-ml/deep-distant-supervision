@@ -248,3 +248,41 @@ class FreebaseFetcher(DataFetcher):
 
             if len(x) > 0:
                 return x, y
+
+
+if __name__ == '__main__':
+    # test data fetcher for nyt dataset
+    def compute_stats(fetcher):
+        num_train_rel = 0
+        num_train_sen = 0
+        num_valid_train_sen = 0
+        rel_dict = defaultdict(int)
+        for batch_x, batch_y in fetcher:
+            num_train_rel += np.sum(batch_y[1:])
+            num_train_sen += len(batch_x)
+            if np.sum(batch_y[1:]) != 0:
+                num_valid_train_sen += len(batch_x)
+            for i in range(1, fetcher.num_rel):
+                if batch_y[i] == 1:
+                    rel_dict[fetcher.id2rel[i]] = len(batch_x)
+        return num_train_rel, num_train_sen, num_valid_train_sen, rel_dict
+
+    logger.info('Loading Fetcher')
+    embed_dim = 50
+    w2v_path = '../data/word2vec.txt'
+    rel_path = '../data/nyt/relation2id.txt'
+    sen_path = '../data/nyt/train.txt'
+    test_path = '../data/nyt/test.txt'
+    fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+    test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
+
+    num_tr, num_ts, num_vts, rel_dict = compute_stats(fetcher)
+    t_num_tr, t_num_ts, t_num_vts, t_rel_dict = compute_stats(test_fetcher)
+
+    print('Number of triples in the training/test set:', num_tr, t_num_tr,)
+    print('Number of sentences included in the training/test triples:', num_ts, t_num_ts)
+    print('Number of valid sentences (sentences whose relation is not NA) included in the training/test triples:',
+          num_vts, t_num_vts)
+    print('Number of training/test setnences for each relation')
+    for key, value in rel_dict.items():
+        print('\tRelation %s: %d, %d' % (key, value, t_rel_dict[key]))

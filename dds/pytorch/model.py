@@ -166,7 +166,7 @@ if __name__ == '__main__':
     num_relations = len(fetcher.rel2id)
 
     model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, fetcher.word_embedding)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
     loss_fn = nn.BCEWithLogitsLoss()
 
     for name, param in model.named_parameters():
