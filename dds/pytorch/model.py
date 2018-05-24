@@ -91,17 +91,17 @@ class DDS(nn.Module):
         x.reverse()  # the longest sequence should be placed in the first of the list
 
         seq_len = list()
-        max_seq = len(x[0][0])
-        batch_in = torch.zeros((len(x), max_seq, self.input_dim))
+        batch_in = list()
         for i, (sen, pos1, pos2) in enumerate(x):
             seq_len.append(len(sen))
             _word = self.w2v(torch.from_numpy(sen))
             _pos1 = self.pos1vec(torch.from_numpy(pos1))
             _pos2 = self.pos2vec(torch.from_numpy(pos2))
             combined = torch.cat((_word, _pos1, _pos2), 1)
-            batch_in[i, :len(sen)] = combined
+            batch_in.append(combined)
 
-        packed_batch_in = nn.utils.rnn.pack_padded_sequence(batch_in, seq_len, batch_first=True)
+        stacked_batch_in = nn.utils.rnn.pad_sequence(batch_in, batch_first=True)
+        packed_batch_in = nn.utils.rnn.pack_padded_sequence(stacked_batch_in, seq_len, batch_first=True)
         rnn_output, _ = self.rnn(packed_batch_in)
         unpacked, unpacked_len = torch.nn.utils.rnn.pad_packed_sequence(rnn_output, batch_first=True)
         sen_embeds = self.word_attn(unpacked, seq_len)
@@ -157,11 +157,12 @@ if __name__ == '__main__':
 
     hidden_dim = 128
     num_valid = 500
-    valid_cycle = 1000
+    valid_cycle = 10000
     num_layers = 2
     seq_len = 70
     pos_dim = 5
     num_epoch = 3
+    batch_size = 4
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
 
@@ -181,19 +182,18 @@ if __name__ == '__main__':
             x, y = next(fetcher)
             valid_data.append((x, y))
 
+        optimizer.zero_grad()
         for i, (x, y) in enumerate(
                 tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
-            _y = torch.from_numpy(y).float()
 
-            optimizer.zero_grad()
-            output = model(x)
-            loss = loss_fn(output, _y)
+            loss = loss_fn(model(x), torch.from_numpy(y).float())/batch_size
             loss.backward()
-            optimizer.step()
+            if i % batch_size == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                logger.debug('%d Done, loss = %f', i, loss)
 
-            logger.debug('%d Done, loss = %f', i, loss)
-
-            if i % valid_cycle == 0:
+            if i % valid_cycle == 0 and i != 0:
                 test(valid_data, model, loss_fn)
 
     test_path = '../../data/nyt/test.txt'
