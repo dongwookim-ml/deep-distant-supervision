@@ -166,7 +166,12 @@ if __name__ == '__main__':
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
 
-    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, fetcher.word_embedding)
+    device = torch.device('cpu')
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+
+    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, fetcher.word_embedding).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
     loss_fn = nn.BCEWithLogitsLoss()
 
