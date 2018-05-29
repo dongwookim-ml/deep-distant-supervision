@@ -129,20 +129,25 @@ def evaluation(prob_y, target_y):
 
 
 def test(test_data, model, loss_fn):
-    logger.info('Validation ...')
-    all_y = list()
-    all_predicted_y = list()
-    loss_sum = 0
-    for x, y in test_data:
-        output = model(x)
-        predicted_y = output.data.numpy()
-        _y = torch.from_numpy(y).float()
-        loss_sum += loss_fn(output, _y)
-        all_y.append(y)
-        all_predicted_y.append(predicted_y)
-    logger.info("Loss sum : %f", loss_sum)
-    evaluation(np.array(all_predicted_y), np.array(all_y))
-    logger.info('Done ...')
+    with torch.no_grad():
+        logger.info('Validation ...')
+        all_y = list()
+        all_predicted_y = list()
+        loss_sum = 0
+        cnt = 0
+        for x, y in test_data:
+            output = model(x)
+            predicted_y = output.data.numpy()
+            _y = torch.from_numpy(y).float()
+            loss_sum += loss_fn(output, _y)
+            all_y.append(y)
+            all_predicted_y.append(predicted_y)
+            if cnt % 1000 == 0:
+                print(cnt, test_data.num_pairs)
+            cnt += 1
+        logger.info("Loss sum : %f", loss_sum)
+        evaluation(np.array(all_predicted_y), np.array(all_y))
+        logger.info('Done ...')
 
 
 if __name__ == '__main__':
@@ -161,7 +166,7 @@ if __name__ == '__main__':
     num_layers = 2
     seq_len = 70
     pos_dim = 5
-    num_epoch = 3
+    num_epoch = 0
     batch_size = 4
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
