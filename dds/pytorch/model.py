@@ -111,6 +111,7 @@ class DDS(nn.Module):
 
 
 def evaluation(prob_y, target_y):
+    num_test, num_rel = prob_y.shape
     target_prob = np.reshape(prob_y[:, 1:], (-1))  # note that the relation of the first column is NA
     target_y = np.array(target_y)
     target_y = np.reshape(target_y[:, 1:], (-1))
@@ -134,7 +135,6 @@ def test(test_data, model, loss_fn):
         all_y = list()
         all_predicted_y = list()
         loss_sum = 0
-        cnt = 0
         for x, y in test_data:
             output = model(x)
             predicted_y = output.data.numpy()
@@ -142,12 +142,9 @@ def test(test_data, model, loss_fn):
             loss_sum += loss_fn(output, _y)
             all_y.append(y)
             all_predicted_y.append(predicted_y)
-            if cnt % 1000 == 0:
-                print(cnt, test_data.num_pairs)
-            cnt += 1
         logger.info("Loss sum : %f", loss_sum)
         evaluation(np.array(all_predicted_y), np.array(all_y))
-        logger.info('Done ...')
+        logger.info('Done')
 
 
 if __name__ == '__main__':
@@ -166,7 +163,7 @@ if __name__ == '__main__':
     num_layers = 2
     seq_len = 70
     pos_dim = 5
-    num_epoch = 0
+    num_epoch = 3
     batch_size = 4
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
@@ -191,7 +188,7 @@ if __name__ == '__main__':
         for i, (x, y) in enumerate(
                 tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
 
-            loss = loss_fn(model(x), torch.from_numpy(y).float())/batch_size
+            loss = loss_fn(model(x), torch.from_numpy(y).float()) / batch_size
             loss.backward()
             if i % batch_size == 0:
                 optimizer.step()
@@ -200,6 +197,10 @@ if __name__ == '__main__':
 
             if i % valid_cycle == 0 and i != 0:
                 test(valid_data, model, loss_fn)
+
+    logger.info('Save Model ...')
+    torch.save(model.state_dict(), 'saved_model.tmp')
+    logger.info('Done')
 
     test_path = '../../data/nyt/test.txt'
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
