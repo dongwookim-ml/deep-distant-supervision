@@ -17,3 +17,4 @@ Parameters are:
 - weight-decay = 1e-5
 - num layers = 2
 - num epoch = 3
+- batch size = 4
