@@ -6,7 +6,7 @@ import pymongo
 from dds.data_utils.config import *
 
 # connect to mongodb
-client = pymongo.MongoClient(MONGO_HOST, MONGO_PORT, username=MONGO_USERNAME, password=MONGO_PASSWORD)
+client = pymongo.MongoClient("mongodb://%s:%s@%s/freebase" % (MONGO_USERNAME, MONGO_PASSWORD, MONGO_HOST))
 wiki_db = client[MG_WIKI_DB]
 sentence_collection = wiki_db[MG_SENTENCE_COL]
 pair_collection = wiki_db[MG_PAIR_COL]
@@ -103,7 +103,7 @@ def lookup_sentence(sid):
 if __name__ == '__main__':
     while True:
         import time
+
         print('Total sentence parsed : {}'.format(sentence_collection.count()))
         print('Total number of entity pairs: {}'.format(pair_count.count()))
         time.sleep(60)
-
