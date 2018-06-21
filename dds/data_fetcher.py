@@ -22,8 +22,7 @@ max_sen_len = 70  # Predefined maximum length of sentence, need for position emb
 
 
 class DataFetcher():
-    def __init__(self, w2v_path='', rel_path='', emb_dim='', data_path='', is_shuffle=True, max_sen_len=70,
-                 include_rel_id=True):
+    def __init__(self, w2v_path='', rel_path='', emb_dim='', data_path='', is_shuffle=True, max_sen_len=70):
         self.w2v_path = w2v_path
         self.rel_path = rel_path
         self.data_path = data_path
@@ -36,7 +35,7 @@ class DataFetcher():
         logger.info('Loading w2v')
         self.word2id, self.word_embedding = self.load_w2v(w2v_path, emb_dim)
         logger.info('Loading relations')
-        self.rel2id, self.id2rel = self.load_relations(rel_path, include_rel_id)
+        self.rel2id, self.id2rel = self.load_relations(rel_path)
         self.num_voca = len(self.word2id)
         self.num_rel = len(self.rel2id)
 
