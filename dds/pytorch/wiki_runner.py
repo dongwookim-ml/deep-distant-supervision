@@ -18,10 +18,10 @@ if __name__ == '__main__':
     logger.info('Loading Fetcher')
     w2v_path = '../../data/word2vec.txt'
     rel_path = '../../data/freebase/relations.txt'
-    fetcher = FreebaseFetcher(w2v_path, rel_path, embed_dim, include_rel_id=False)
+    fetcher = FreebaseFetcher(w2v_path, rel_path, embed_dim)
 
     hidden_dim = 256
-    num_valid = 5000
+    num_valid = 1000
     valid_cycle = 100000
     num_layers = 2
     seq_len = 70
