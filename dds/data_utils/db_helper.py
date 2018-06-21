@@ -6,11 +6,11 @@ import pymongo
 from dds.data_utils.config import *
 
 # connect to mongodb
-client = pymongo.MongoClient(MONGO_HOST, MONGO_PORT)
-mongo_db = client[MG_WIKI_DB]
-sentence_collection = mongo_db[MG_SENTENCE_COL]
-pair_collection = mongo_db[MG_PAIR_COL]
-pair_count = mongo_db[MG_PAIR_CNT]
+client = pymongo.MongoClient(MONGO_HOST, MONGO_PORT, username=MONGO_USERNAME, password=MONGO_PASSWORD)
+wiki_db = client[MG_WIKI_DB]
+sentence_collection = wiki_db[MG_SENTENCE_COL]
+pair_collection = wiki_db[MG_PAIR_COL]
+pair_count = wiki_db[MG_PAIR_CNT]
 
 fb_db = client[MG_FB_DB]
 relation_collection = fb_db[MG_REL_COL]
