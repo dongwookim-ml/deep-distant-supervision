@@ -186,7 +186,7 @@ if __name__ == '__main__':
 
         optimizer.zero_grad()
         for i, (x, y) in enumerate(
-                tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
+                tqdm(fetcher, initial=epoch * fetcher.num_pairs, total=(fetcher.num_pairs - num_valid) * num_epoch)):
 
             loss = loss_fn(model(x), torch.from_numpy(y).float()) / batch_size
             loss.backward()

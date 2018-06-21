@@ -22,7 +22,8 @@ max_sen_len = 70  # Predefined maximum length of sentence, need for position emb
 
 
 class DataFetcher():
-    def __init__(self, w2v_path='', rel_path='', emb_dim='', data_path='', is_shuffle=True, max_sen_len=70):
+    def __init__(self, w2v_path='', rel_path='', emb_dim='', data_path='', is_shuffle=True, max_sen_len=70,
+                 include_rel_id=True):
         self.w2v_path = w2v_path
         self.rel_path = rel_path
         self.data_path = data_path
@@ -35,7 +36,7 @@ class DataFetcher():
         logger.info('Loading w2v')
         self.word2id, self.word_embedding = self.load_w2v(w2v_path, emb_dim)
         logger.info('Loading relations')
-        self.rel2id, self.id2rel = self.load_relations(rel_path)
+        self.rel2id, self.id2rel = self.load_relations(rel_path, include_rel_id)
         self.num_voca = len(self.word2id)
         self.num_rel = len(self.rel2id)
 
@@ -69,22 +70,13 @@ class DataFetcher():
         word_embeddings = np.array(vec, dtype=np.float32)
         return word2id, word_embeddings
 
-    # 2. Load target relations including NA
-    def load_relations(self, path, include_id=True):
-        rel2id = dict()
-        id2rel = dict()
+    @abstractmethod
+    def _load_relations(self, path):
+        """ return relations from relation file"""
 
-        with open(path, 'r') as f:
-            for line in f:
-                if include_id:
-                    rel, id = line.strip().split()
-                    rel2id[rel] = int(id)
-                    id2rel[int(id)] = rel
-                else:
-                    # first token of each line will be a relation name
-                    rel2id[line.strip().split()[0]] = len(rel2id)
-                    id2rel[len(rel2id) - 1] = line.strip()
-        return rel2id, id2rel
+    # 2. Load target relations including NA
+    def load_relations(self, path):
+        return self._load_relations(path)
 
 
 class NYTFetcher(DataFetcher):
@@ -97,6 +89,17 @@ class NYTFetcher(DataFetcher):
         if self.is_shuffle:
             np.random.shuffle(self.keys)
         logger.info('Loading fetcher done')
+
+    def _load_relations(self, path):
+        rel2id = dict()
+        id2rel = dict()
+
+        with open(path, 'r') as f:
+            for line in f:
+                rel, id = line.strip().split()
+                rel2id[rel] = int(id)
+                id2rel[int(id)] = rel
+        return rel2id, id2rel
 
     def _load_triple(self, datapath):
         """
@@ -188,6 +191,25 @@ class FreebaseFetcher(DataFetcher):
         self.cur = pair_count.find()
         self.current_pos = 0
         self.num_pairs = self.pair_collection.count()
+
+    def _load_relations(self, path):
+        rel2id = dict()
+        id2rel = dict()
+
+        with open(path, 'r') as f:
+            for line in f:
+                tokens = line.strip().split()
+                if len(tokens) == 3:
+                    if int(tokens[2]) > 100:
+                        #minimum number of sentences to be trained
+                        rel2id[line.strip().split()[0]] = len(rel2id)
+                        id2rel[len(rel2id) - 1] = line.strip()
+                else:
+                    # NA
+                    rel2id[line.strip().split()[0]] = len(rel2id)
+                    id2rel[len(rel2id) - 1] = line.strip()
+
+        return rel2id, id2rel
 
     def _sentence2id(self, sentence):
         sen2tid = list()  # sentence to list of token ids
