@@ -1,5 +1,20 @@
 """
 Database operations
+
+
+add user to mongodb
+
+db.createUser(
+  {
+    user: "uid",
+    pwd: "pwd",
+    roles: [
+       { role: "read", db: "freebase" },
+       { role: "read", db: "wikipedia" },
+    ]
+  }
+)
+
 """
 import redis
 import pymongo

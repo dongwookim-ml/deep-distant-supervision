@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 OOV = 'OOV'
 BLANK = 'BLANK'
 max_sen_len = 70  # Predefined maximum length of sentence, need for position embedding
+max_sens = 100 # maximum number of sentences for an entity pair
 
 
 class DataFetcher():
@@ -259,6 +260,9 @@ class FreebaseFetcher(DataFetcher):
                     pos2vec = np.arange(max_sen_len - en2pos, max_sen_len - en2pos + sen_len)
                     sen2tid = self._sentence2id(sen_row['sentence'])
                     x.append((sen2tid, pos1vec, pos2vec))
+
+                if len(x) > max_sens:
+                    break
 
             rel_cur = self.relation_collection.find(query)
             y = np.zeros(self.num_rel)
