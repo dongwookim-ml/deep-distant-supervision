@@ -198,6 +198,8 @@ if __name__ == '__main__':
             if i % valid_cycle == 0 and i != 0:
                 test(valid_data, model, loss_fn)
 
+        torch.save(model.state_dict(), 'saved_model.tmp')
+
     logger.info('Save Model ...')
     torch.save(model.state_dict(), 'saved_model.tmp')
     logger.info('Done')

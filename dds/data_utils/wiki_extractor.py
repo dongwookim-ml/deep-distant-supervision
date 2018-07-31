@@ -8,7 +8,6 @@ MongoDB is used to store extracted sentences and entities
 import sys, traceback
 from dds.data_utils.datautils import merge_ners, get_nerspos
 from dds.data_utils.wikipedia import iter_wiki
-from dds.data_utils.db_helper import add_sentence, add_pair, lookup_fb, get_wiki_parsed_stat, set_wiki_parsed_cnt
 import itertools
 import logging
 from nltk.tag.stanford import CoreNLPNERTagger
@@ -23,12 +22,13 @@ logger.addHandler(ch)
 logger.setLevel('INFO')
 
 
-def extract_ners(tokens, tagger):
+def extract_ners(tokens, tagger, lookup=True):
     """
     Extract freebase entities (NERs) from token using NER tagger.
 
     :param tokens: list of tokens forming a sentence
     :param tagger: NER tagger return list of tokens with corresponding NER tags
+    :param lookup: whether lookup freebase to find entity or not
     :return: if there are more than two freebase entities in the sentence, then return list of tokens,
     ners, and freebase ner ids. each ner is again a list of tokens.
     """
@@ -44,7 +44,12 @@ def extract_ners(tokens, tagger):
     valid_ner_id = list()
     for ner in ners:
         # ner = ((tokens), tag)
-        rval = lookup_fb(ner[0])
+        if lookup:
+            from dds.data_utils.db_helper import lookup_fb
+            rval = lookup_fb(ner[0])
+        else:
+            rval = True
+
         if rval is not None:
             if ner[0] not in valid_ners:
                 valid_ners.append(ner[0])
@@ -65,6 +70,8 @@ def process_sentence(tokens, ners, ner_id):
     :param ners: list of ners in the token list
     :param ner_id: list of freebase id for each ner
     """
+    from dds.data_utils.db_helper import add_sentence
+
     ner_pos = get_nerspos(tokens, ners)
 
     sid = add_sentence(tokens, ners, ner_pos)
@@ -76,6 +83,8 @@ def process_sentence(tokens, ners, ner_id):
 
 
 if __name__ == '__main__':
+    from dds.data_utils.db_helper import add_pair, get_wiki_parsed_stat, set_wiki_parsed_cnt
+
     num_thread = 8
     server_url = 'http://localhost:9000'  # Stanford corenlp server address
     stream = iter_wiki()
