@@ -92,6 +92,28 @@ class Predictor:
         return predicted_y
 
 
+    def extract_topk(self, result, k):
+        score_matrix = np.zeros((len(result), self.fetcher.num_rel))
+
+        pair_list = list()
+        for i, (en_pair, scores) in enumerate(result.items()):
+            pair_list.append(en_pair)
+            score_matrix[i] = scores
+
+        score_matrix = score_matrix[:, 1:]
+
+        top_index = np.unravel_index(np.argsort(np.ravel(score_matrix))[::-1][:k], score_matrix.shape)
+
+        rval = list()
+        for item in np.transpose(top_index):
+            pair_no = item[0]
+            rel_no = item[1]
+            logger.info(pair_list[pair_no], self.fetcher.id2rel[rel_no+1])
+            rval.append((pair_list[pair_no], self.fetcher.id2rel[rel_no+1]))
+
+        return rval
+
+
 if __name__ == '__main__':
     embed_dim = 50
     logger.info('Loading Fetcher')
@@ -103,8 +125,8 @@ if __name__ == '__main__':
     ner_tagger = CoreNLPNERTagger(url=ner_server_url)
 
     predictor = Predictor(model_path, embed_dim, w2v_path, rel_path, sen_path, ner_tagger)
-    corpus = [('hello my name is Dongwoo, your name is Minjeong'), ('This is test document writtne in New York and Atlanta')]
+    corpus = [('hello my name is Dongwoo, and your name is Minjeong'), ('This is test document written in New York and Atlanta')]
     result = predictor.test(corpus)
-    print(result)
+    predictor.extract_topk(result, 10)
 
 
