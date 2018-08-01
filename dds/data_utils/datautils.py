@@ -27,6 +27,8 @@ def merge_ners(tokens):
     keep = False
     prev_tag = 'O'
 
+    tokens.append(('NA', 'O'))
+
     for i, (token, tag) in enumerate(tokens):
         if keep:
             if tag not in IGNORE_NER_TAG:

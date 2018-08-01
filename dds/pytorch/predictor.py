@@ -1,7 +1,6 @@
 import logging, sys, itertools
 import numpy as np
 import torch
-from torch import nn
 from dds.pytorch.model import DDS
 from dds.data_fetcher import NYTFetcher, OOV, max_sen_len, max_sens
 from dds.data_utils.wiki_extractor import extract_ners
@@ -18,9 +17,9 @@ logger.setLevel('INFO')
 
 
 class Predictor:
-    def __init__(self, model_path, embed_dim, w2v_path, rel_path, sen_path, ner_tagger):
-        self.fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
-        self.model = torch.load(model_path)
+    def __init__(self, fetcher, model, ner_tagger):
+        self.fetcher = fetcher
+        self.model = model
         self.tagger = ner_tagger
         self.sentence_collection = dict()
         self.entity_pair_dict = defaultdict(list)
@@ -47,7 +46,7 @@ class Predictor:
                     num_ner = len(ner_pos)
                     for first_ner, second_ner in itertools.product(range(num_ner - 1), range(1, num_ner)):
                         for pos1, pos2 in itertools.product(ner_pos[first_ner], ner_pos[second_ner]):
-                            self.entity_pair_dict[(ners[first_ner], ners[second_ner])].append((pos1,pos2,sid))
+                            self.entity_pair_dict[(' '.join(ners[first_ner]), ' '.join(ners[second_ner]))].append((pos1,pos2,sid))
 
 
     def convert_datapoint(self, collection):
@@ -108,7 +107,7 @@ class Predictor:
         for item in np.transpose(top_index):
             pair_no = item[0]
             rel_no = item[1]
-            logger.info(pair_list[pair_no], self.fetcher.id2rel[rel_no+1])
+            print(pair_list[pair_no], self.fetcher.id2rel[rel_no+1], score_matrix[pair_no, rel_no])
             rval.append((pair_list[pair_no], self.fetcher.id2rel[rel_no+1]))
 
         return rval
@@ -122,10 +121,27 @@ if __name__ == '__main__':
     sen_path = '../../data/nyt/train.txt'
     model_path = 'saved_model_0.tmp'
     ner_server_url = 'http://localhost:9000'  # Stanford corenlp server address
+
+    hidden_dim = 128
+    num_valid = 500
+    valid_cycle = 10000
+    num_layers = 2
+    seq_len = 70
+    pos_dim = 5
+    num_epoch = 3
+    batch_size = 4
+
+    fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, sen_path)
+
+    num_voca = len(fetcher.word2id)
+    num_relations = len(fetcher.rel2id)
+
+    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, fetcher.word_embedding)
+    model.load_state_dict(torch.load(model_path))
     ner_tagger = CoreNLPNERTagger(url=ner_server_url)
 
-    predictor = Predictor(model_path, embed_dim, w2v_path, rel_path, sen_path, ner_tagger)
-    corpus = [('hello my name is Dongwoo, and your name is Minjeong'), ('This is test document written in New York and Atlanta')]
+    predictor = Predictor(fetcher, model, ner_tagger)
+    corpus = ['Canberra is the capital city of Australia', 'This is test document written in New York and Atlanta']
     result = predictor.test(corpus)
     predictor.extract_topk(result, 10)
 
