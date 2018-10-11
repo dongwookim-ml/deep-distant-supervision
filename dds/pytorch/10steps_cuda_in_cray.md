@@ -1,8 +1,10 @@
 1. Install cuda in a local directory. Go to home folder and run
+
 `wget https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda_9.0.176_384.81_linux-run`
-- As of Oct, 2018, Cuda 9.2 cannot be installed in cray because the driver installed does not satisfy the requirement of 9.2
-- You can download the older version of cuda from https://developer.nvidia.com/cuda-toolkit-archive
-- Download configuration was : Linux / x86_64 / Ubuntu / 17.04 / runfile (local)
+
+ - As of Oct, 2018, Cuda 9.2 cannot be installed in cray because the driver installed does not satisfy the requirement of 9.2
+ - You can download the older version of cuda from https://developer.nvidia.com/cuda-toolkit-archive
+ - Download configuration was : Linux / x86_64 / Ubuntu / 17.04 / runfile (local)
 
 2. Add execution permission to file
 `chmod +x cuda_9.0.176_384.81_linux-run`
