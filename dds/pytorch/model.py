@@ -61,10 +61,11 @@ class DDS(nn.Module):
     Deep distant supervision model
     """
 
-    def __init__(self, embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, embed=None,
+    def __init__(self, embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, device, embed=None,
                  dropout_prob=0.5, activation_fn=nn.ReLU):
         logger.info('Initialize DDS model')
         super(DDS, self).__init__()
+        self.device = device
 
         if embed is not None and type(embed) == np.ndarray:
             embed = torch.from_numpy(embed)
@@ -94,9 +95,9 @@ class DDS(nn.Module):
         batch_in = list()
         for i, (sen, pos1, pos2) in enumerate(x):
             seq_len.append(len(sen))
-            _word = self.w2v(torch.from_numpy(sen))
-            _pos1 = self.pos1vec(torch.from_numpy(pos1))
-            _pos2 = self.pos2vec(torch.from_numpy(pos2))
+            _word = self.w2v(torch.from_numpy(sen).to(self.device))
+            _pos1 = self.pos1vec(torch.from_numpy(pos1).to(self.device))
+            _pos2 = self.pos2vec(torch.from_numpy(pos2).to(self.device))
             combined = torch.cat((_word, _pos1, _pos2), 1)
             batch_in.append(combined)
 
@@ -128,18 +129,17 @@ def evaluation(prob_y, target_y):
     logger.info("Average Precision: %f", ap)
 
 
-def test(test_data, model, loss_fn):
+def test(test_data, model, loss_fn, device):
     logger.info('Validation ...')
     all_y = list()
     all_predicted_y = list()
     loss_sum = 0
     for x, y in test_data:
         output = model(x)
-        predicted_y = output.data.numpy()
-        _y = torch.from_numpy(y).float()
+        _y = torch.from_numpy(y).float().to(device)
         loss_sum += loss_fn(output, _y)
         all_y.append(y)
-        all_predicted_y.append(predicted_y)
+        all_predicted_y.append(output.data.cpu().numpy())
     logger.info("Loss sum : %f", loss_sum)
     evaluation(np.array(all_predicted_y), np.array(all_y))
     logger.info('Done ...')
@@ -147,6 +147,13 @@ def test(test_data, model, loss_fn):
 
 if __name__ == '__main__':
     from sklearn.metrics import roc_auc_score, average_precision_score
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda:1')
+    else:
+        device = torch.device('cpu')
+
+    print('Current device :', device)
 
     embed_dim = 50
     logger.info('Loading Fetcher')
@@ -166,7 +173,9 @@ if __name__ == '__main__':
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
 
-    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, fetcher.word_embedding)
+    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, device, embed=fetcher.word_embedding)
+    model = model.to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
     loss_fn = nn.BCEWithLogitsLoss()
 
@@ -185,8 +194,8 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         for i, (x, y) in enumerate(
                 tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
-
-            loss = loss_fn(model(x), torch.from_numpy(y).float())/batch_size
+            _y = torch.from_numpy(y).float().to(device)
+            loss = loss_fn(model(x), _y)/batch_size
             loss.backward()
             if i % batch_size == 0:
                 optimizer.step()
@@ -194,8 +203,8 @@ if __name__ == '__main__':
                 logger.debug('%d Done, loss = %f', i, loss)
 
             if i % valid_cycle == 0 and i != 0:
-                test(valid_data, model, loss_fn)
+                test(valid_data, model, loss_fn, device)
 
     test_path = '../../data/nyt/test.txt'
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
-    test(test_fetcher, model, loss_fn)
+    test(test_fetcher, model, loss_fn, device)
