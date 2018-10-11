@@ -130,7 +130,6 @@ def evaluation(prob_y, target_y):
     logger.info("Average Precision: %f", ap)
 
 
-<<<<<<< HEAD
 def test(test_data, model, loss_fn, device):
     logger.info('Validation ...')
     all_y = list()
@@ -145,24 +144,6 @@ def test(test_data, model, loss_fn, device):
     logger.info("Loss sum : %f", loss_sum)
     evaluation(np.array(all_predicted_y), np.array(all_y))
     logger.info('Done ...')
-=======
-def test(test_data, model, loss_fn):
-    with torch.no_grad():
-        logger.info('Validation ...')
-        all_y = list()
-        all_predicted_y = list()
-        loss_sum = 0
-        for x, y in test_data:
-            output = model(x)
-            predicted_y = output.data.numpy()
-            _y = torch.from_numpy(y).float()
-            loss_sum += loss_fn(output, _y)
-            all_y.append(y)
-            all_predicted_y.append(predicted_y)
-        logger.info("Loss sum : %f", loss_sum)
-        evaluation(np.array(all_predicted_y), np.array(all_y))
-        logger.info('Done')
->>>>>>> 15744a0da57204ef5aafb83d7592da9d29eb861b
 
 
 if __name__ == '__main__':
@@ -193,7 +174,8 @@ if __name__ == '__main__':
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
 
-    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, device, embed=fetcher.word_embedding)
+    model = DDS(embed_dim, hidden_dim, num_layers, num_relations, num_voca, pos_dim, device,
+                embed=fetcher.word_embedding)
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
@@ -213,15 +195,9 @@ if __name__ == '__main__':
 
         optimizer.zero_grad()
         for i, (x, y) in enumerate(
-<<<<<<< HEAD
                 tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
             _y = torch.from_numpy(y).float().to(device)
-            loss = loss_fn(model(x), _y)/batch_size
-=======
-                tqdm(fetcher, initial=epoch * fetcher.num_pairs, total=(fetcher.num_pairs - num_valid) * num_epoch)):
-
-            loss = loss_fn(model(x), torch.from_numpy(y).float()) / batch_size
->>>>>>> 15744a0da57204ef5aafb83d7592da9d29eb861b
+            loss = loss_fn(model(x), _y) / batch_size
             loss.backward()
             if i % batch_size == 0:
                 optimizer.step()
