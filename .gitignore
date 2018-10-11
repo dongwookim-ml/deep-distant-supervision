@@ -11,6 +11,8 @@ samples
 *.zip
 *.tar.gz
 
+*.tmp
+
 # wikipedia data
 *.bz2
 *.gz

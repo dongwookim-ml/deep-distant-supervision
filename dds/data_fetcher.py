@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 OOV = 'OOV'
 BLANK = 'BLANK'
 max_sen_len = 70  # Predefined maximum length of sentence, need for position embedding
+max_sens = 100 # maximum number of sentences for an entity pair
 
 
 class DataFetcher():
@@ -69,22 +70,13 @@ class DataFetcher():
         word_embeddings = np.array(vec, dtype=np.float32)
         return word2id, word_embeddings
 
-    # 2. Load target relations including NA
-    def load_relations(self, path, include_id=True):
-        rel2id = dict()
-        id2rel = dict()
+    @abstractmethod
+    def _load_relations(self, path):
+        """ return relations from relation file"""
 
-        with open(path, 'r') as f:
-            for line in f:
-                if include_id:
-                    rel, id = line.strip().split()
-                    rel2id[rel] = int(id)
-                    id2rel[int(id)] = rel
-                else:
-                    # first token of each line will be a relation name
-                    rel2id[line.strip().split()[0]] = len(rel2id)
-                    id2rel[len(rel2id) - 1] = line.strip()
-        return rel2id, id2rel
+    # 2. Load target relations including NA
+    def load_relations(self, path):
+        return self._load_relations(path)
 
 
 class NYTFetcher(DataFetcher):
@@ -97,6 +89,17 @@ class NYTFetcher(DataFetcher):
         if self.is_shuffle:
             np.random.shuffle(self.keys)
         logger.info('Loading fetcher done')
+
+    def _load_relations(self, path):
+        rel2id = dict()
+        id2rel = dict()
+
+        with open(path, 'r') as f:
+            for line in f:
+                rel, id = line.strip().split()
+                rel2id[rel] = int(id)
+                id2rel[int(id)] = rel
+        return rel2id, id2rel
 
     def _load_triple(self, datapath):
         """
@@ -189,6 +192,25 @@ class FreebaseFetcher(DataFetcher):
         self.current_pos = 0
         self.num_pairs = self.pair_collection.count()
 
+    def _load_relations(self, path):
+        rel2id = dict()
+        id2rel = dict()
+
+        with open(path, 'r') as f:
+            for line in f:
+                tokens = line.strip().split()
+                if len(tokens) == 3:
+                    if int(tokens[2]) > 100:
+                        #minimum number of sentences to be trained
+                        rel2id[line.strip().split()[0]] = len(rel2id)
+                        id2rel[len(rel2id) - 1] = line.strip()
+                else:
+                    # NA
+                    rel2id[line.strip().split()[0]] = len(rel2id)
+                    id2rel[len(rel2id) - 1] = line.strip()
+
+        return rel2id, id2rel
+
     def _sentence2id(self, sentence):
         sen2tid = list()  # sentence to list of token ids
         for token in sentence:
@@ -238,6 +260,9 @@ class FreebaseFetcher(DataFetcher):
                     pos2vec = np.arange(max_sen_len - en2pos, max_sen_len - en2pos + sen_len)
                     sen2tid = self._sentence2id(sen_row['sentence'])
                     x.append((sen2tid, pos1vec, pos2vec))
+
+                if len(x) > max_sens:
+                    break
 
             rel_cur = self.relation_collection.find(query)
             y = np.zeros(self.num_rel)

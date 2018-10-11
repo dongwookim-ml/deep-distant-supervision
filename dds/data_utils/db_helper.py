@@ -1,16 +1,31 @@
 """
 Database operations
+
+
+add user to mongodb
+
+db.createUser(
+  {
+    user: "uid",
+    pwd: "pwd",
+    roles: [
+       { role: "read", db: "freebase" },
+       { role: "read", db: "wikipedia" },
+    ]
+  }
+)
+
 """
 import redis
 import pymongo
 from dds.data_utils.config import *
 
 # connect to mongodb
-client = pymongo.MongoClient(MONGO_HOST, MONGO_PORT)
-mongo_db = client[MG_WIKI_DB]
-sentence_collection = mongo_db[MG_SENTENCE_COL]
-pair_collection = mongo_db[MG_PAIR_COL]
-pair_count = mongo_db[MG_PAIR_CNT]
+client = pymongo.MongoClient("mongodb://%s:%s@%s/freebase" % (MONGO_USERNAME, MONGO_PASSWORD, MONGO_HOST))
+wiki_db = client[MG_WIKI_DB]
+sentence_collection = wiki_db[MG_SENTENCE_COL]
+pair_collection = wiki_db[MG_PAIR_COL]
+pair_count = wiki_db[MG_PAIR_CNT]
 
 fb_db = client[MG_FB_DB]
 relation_collection = fb_db[MG_REL_COL]
@@ -103,7 +118,7 @@ def lookup_sentence(sid):
 if __name__ == '__main__':
     while True:
         import time
+
         print('Total sentence parsed : {}'.format(sentence_collection.count()))
         print('Total number of entity pairs: {}'.format(pair_count.count()))
         time.sleep(60)
-

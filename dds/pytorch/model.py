@@ -112,6 +112,7 @@ class DDS(nn.Module):
 
 
 def evaluation(prob_y, target_y):
+    num_test, num_rel = prob_y.shape
     target_prob = np.reshape(prob_y[:, 1:], (-1))  # note that the relation of the first column is NA
     target_y = np.array(target_y)
     target_y = np.reshape(target_y[:, 1:], (-1))
@@ -129,6 +130,7 @@ def evaluation(prob_y, target_y):
     logger.info("Average Precision: %f", ap)
 
 
+<<<<<<< HEAD
 def test(test_data, model, loss_fn, device):
     logger.info('Validation ...')
     all_y = list()
@@ -143,6 +145,24 @@ def test(test_data, model, loss_fn, device):
     logger.info("Loss sum : %f", loss_sum)
     evaluation(np.array(all_predicted_y), np.array(all_y))
     logger.info('Done ...')
+=======
+def test(test_data, model, loss_fn):
+    with torch.no_grad():
+        logger.info('Validation ...')
+        all_y = list()
+        all_predicted_y = list()
+        loss_sum = 0
+        for x, y in test_data:
+            output = model(x)
+            predicted_y = output.data.numpy()
+            _y = torch.from_numpy(y).float()
+            loss_sum += loss_fn(output, _y)
+            all_y.append(y)
+            all_predicted_y.append(predicted_y)
+        logger.info("Loss sum : %f", loss_sum)
+        evaluation(np.array(all_predicted_y), np.array(all_y))
+        logger.info('Done')
+>>>>>>> 15744a0da57204ef5aafb83d7592da9d29eb861b
 
 
 if __name__ == '__main__':
@@ -193,9 +213,15 @@ if __name__ == '__main__':
 
         optimizer.zero_grad()
         for i, (x, y) in enumerate(
+<<<<<<< HEAD
                 tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
             _y = torch.from_numpy(y).float().to(device)
             loss = loss_fn(model(x), _y)/batch_size
+=======
+                tqdm(fetcher, initial=epoch * fetcher.num_pairs, total=(fetcher.num_pairs - num_valid) * num_epoch)):
+
+            loss = loss_fn(model(x), torch.from_numpy(y).float()) / batch_size
+>>>>>>> 15744a0da57204ef5aafb83d7592da9d29eb861b
             loss.backward()
             if i % batch_size == 0:
                 optimizer.step()
@@ -204,6 +230,12 @@ if __name__ == '__main__':
 
             if i % valid_cycle == 0 and i != 0:
                 test(valid_data, model, loss_fn, device)
+
+        torch.save(model.state_dict(), 'saved_model.tmp')
+
+    logger.info('Save Model ...')
+    torch.save(model.state_dict(), 'saved_model.tmp')
+    logger.info('Done')
 
     test_path = '../../data/nyt/test.txt'
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)

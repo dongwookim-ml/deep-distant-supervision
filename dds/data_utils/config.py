@@ -10,6 +10,8 @@ REDIS_PORT = 6379
 
 MONGO_HOST = 'localhost'
 MONGO_PORT = 27017
+MONGO_USERNAME = ''
+MONGO_PASSWORD = ''
 
 MG_FB_DB = 'freebase'
 MG_REL_COL = 'fb_relation_col'
