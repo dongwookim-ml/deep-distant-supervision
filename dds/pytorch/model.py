@@ -1,10 +1,12 @@
 import torch
+from torch import FloatTensor, LongTensor
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 import sys
 import logging
 import numpy as np
-from tqdm import tqdm
 from dds.data_fetcher import NYTFetcher
 
 # Logger
@@ -14,11 +16,43 @@ logger = logging.getLogger()
 logger.addHandler(ch)
 logger.setLevel('INFO')
 
+max_sen_len = 70  # Predefined maximum length of sentence, need for position embedding
+max_sens = 100  # maximum number of sentences for an entity pair
+
 
 def new_parameter(*size):
-    out = nn.Parameter(torch.FloatTensor(*size))
+    out = nn.Parameter(FloatTensor(*size))
     torch.nn.init.xavier_normal(out)
     return out
+
+
+class NYTData(torch.utils.data.Dataset):
+    """
+    use Dataset class to prefetch data into GPUs
+    """
+
+    def __init__(self, nyt_fetcher, device):
+        """
+        Initialise dataset
+        :param nyt_fetcher: nyt dataset fetcher
+        """
+        self.data = [(xs, y) for (xs, y) in nyt_fetcher]
+        self.device = device
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        x, y = self.data[idx]
+        x = sorted(x, key=lambda x: len(x[0]))
+        x.reverse()  # the longest sequence should be placed in the first of the list
+        new_x = list()
+        y = FloatTensor(y).to(self.device)
+        for a, b, c in x:
+            new_x.append((LongTensor(a).to(self.device),
+                          LongTensor(b).to(self.device),
+                          LongTensor(c).to(self.device)))
+        return new_x, y
 
 
 class SentenceAttention(nn.Module):
@@ -88,16 +122,13 @@ class DDS(nn.Module):
         logger.info('Done')
 
     def forward(self, x):
-        x = sorted(x, key=lambda x: len(x[0]))
-        x.reverse()  # the longest sequence should be placed in the first of the list
-
         seq_len = list()
         batch_in = list()
         for i, (sen, pos1, pos2) in enumerate(x):
             seq_len.append(len(sen))
-            _word = self.w2v(torch.from_numpy(sen).to(self.device))
-            _pos1 = self.pos1vec(torch.from_numpy(pos1).to(self.device))
-            _pos2 = self.pos2vec(torch.from_numpy(pos2).to(self.device))
+            _word = self.w2v(sen.squeeze())
+            _pos1 = self.pos1vec(pos1.squeeze())
+            _pos2 = self.pos2vec(pos2.squeeze())
             combined = torch.cat((_word, _pos1, _pos2), 1)
             batch_in.append(combined)
 
@@ -112,7 +143,6 @@ class DDS(nn.Module):
 
 
 def evaluation(prob_y, target_y):
-    num_test, num_rel = prob_y.shape
     target_prob = np.reshape(prob_y[:, 1:], (-1))  # note that the relation of the first column is NA
     target_y = np.array(target_y)
     target_y = np.reshape(target_y[:, 1:], (-1))
@@ -130,16 +160,15 @@ def evaluation(prob_y, target_y):
     logger.info("Average Precision: %f", ap)
 
 
-def test(test_data, model, loss_fn, device):
+def test(test_data, model, loss_fn):
     logger.info('Validation ...')
     all_y = list()
     all_predicted_y = list()
     loss_sum = 0
     for x, y in test_data:
         output = model(x)
-        _y = torch.from_numpy(y).float().to(device)
-        loss_sum += loss_fn(output, _y)
-        all_y.append(y)
+        loss_sum += loss_fn(output, y)
+        all_y.append(y.data.cpu().numpy())
         all_predicted_y.append(output.data.cpu().numpy())
     logger.info("Loss sum : %f", loss_sum)
     evaluation(np.array(all_predicted_y), np.array(all_y))
@@ -150,7 +179,7 @@ if __name__ == '__main__':
     from sklearn.metrics import roc_auc_score, average_precision_score
 
     if torch.cuda.is_available():
-        device = torch.device('cuda:1')
+        device = torch.device('cuda:2')
     else:
         device = torch.device('cpu')
 
@@ -170,7 +199,7 @@ if __name__ == '__main__':
     seq_len = 70
     pos_dim = 5
     num_epoch = 3
-    batch_size = 4
+    batch_size = 1
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
 
@@ -185,19 +214,22 @@ if __name__ == '__main__':
         if param.requires_grad:
             logger.debug('Param %s : %s', name, param.shape)
 
+    nyt_dataset = NYTData(fetcher, device)
+    dataset_loader = DataLoader(nyt_dataset, batch_size=1, shuffle=True, drop_last=True)
+
     for epoch in range(num_epoch):
         fetcher.reset()
 
         valid_data = list()
-        for i in range(num_valid):
-            x, y = next(fetcher)
-            valid_data.append((x, y))
+        for i, (x, y) in enumerate(dataset_loader):
+            valid_data.append((x, y.squeeze()))
+            if i == num_valid:
+                break
 
         optimizer.zero_grad()
-        for i, (x, y) in enumerate(
-                tqdm(fetcher, initial=epoch * len(fetcher.pairs), total=(len(fetcher.pairs) - num_valid) * num_epoch)):
-            _y = torch.from_numpy(y).float().to(device)
-            loss = loss_fn(model(x), _y) / batch_size
+        for i, (x, y) in enumerate(tqdm(dataset_loader, initial=epoch * (len(nyt_dataset) - num_valid),
+                                        total=(len(nyt_dataset) - num_valid) * num_epoch)):
+            loss = loss_fn(model(x), y.squeeze()) / batch_size
             loss.backward()
             if i % batch_size == 0:
                 optimizer.step()
@@ -205,7 +237,7 @@ if __name__ == '__main__':
                 logger.debug('%d Done, loss = %f', i, loss)
 
             if i % valid_cycle == 0 and i != 0:
-                test(valid_data, model, loss_fn, device)
+                test(valid_data, model, loss_fn)
 
         torch.save(model.state_dict(), 'saved_model.tmp')
 
@@ -215,4 +247,4 @@ if __name__ == '__main__':
 
     test_path = '../../data/nyt/test.txt'
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
-    test(test_fetcher, model, loss_fn, device)
+    test(test_fetcher, model, loss_fn)
