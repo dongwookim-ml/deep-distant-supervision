@@ -247,4 +247,6 @@ if __name__ == '__main__':
 
     test_path = '../../data/nyt/test.txt'
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
-    test(test_fetcher, model, loss_fn)
+    test_data = NYTData(test_fetcher, device)
+    test_loader = DataLoader(test_data, batch_size=1)
+    test(test_loader, model, loss_fn)
