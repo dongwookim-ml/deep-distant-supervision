@@ -167,7 +167,7 @@ def test(test_data, model, loss_fn):
     loss_sum = 0
     for x, y in test_data:
         output = model(x)
-        loss_sum += loss_fn(output, y)
+        loss_sum += loss_fn(output.squeeze(), y.squeeze())
         all_y.append(y.data.cpu().numpy())
         all_predicted_y.append(output.data.cpu().numpy())
     logger.info("Loss sum : %f", loss_sum)
