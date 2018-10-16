@@ -86,6 +86,10 @@ class NYTFetcher(DataFetcher):
         self.pairs, self.sen_col = self._load_triple(self.data_path)
         self.keys = list(self.pairs.keys())
         self.num_pairs = len(self.pairs)
+        self.fid2token = {}
+        self.fid2uid = {}
+        self.uid2token = {}
+
         if self.is_shuffle:
             np.random.shuffle(self.keys)
         logger.info('Loading fetcher done')
@@ -114,6 +118,12 @@ class NYTFetcher(DataFetcher):
                 # the number of tokens are not the same for train.txt and test.txt, cannot unpack directly from split
                 en1id, en2id, en1token, en2token, rel, sen = tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], \
                                                              tokens[5]
+
+                # construct entity vector
+                if en1id not in self.en2fid:
+                    self.fid2uid[en1id] = len(self.fid2uid)
+                    self.fid2token[en1id] = en1token
+                    self.uid2token[self.fid2uid[en1id]] = en1token
 
                 # add relation
                 triples[(en1id, en2id)].add(rel)

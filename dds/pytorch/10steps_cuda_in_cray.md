@@ -5,6 +5,8 @@
  - As of Oct, 2018, Cuda 9.2 cannot be installed in cray because the driver installed does not satisfy the requirement of 9.2
  - You can download the older version of cuda from https://developer.nvidia.com/cuda-toolkit-archive
  - Download configuration was : Linux / x86_64 / Ubuntu / 17.04 / runfile (local)
+   - Note that the current system version is 18.04, which is not supproted by Cuda 9.0. 
+   - So far there's no problem with 17.04.
 
 2. Add execution permission to file
 `chmod +x cuda_9.0.176_384.81_linux-run`
