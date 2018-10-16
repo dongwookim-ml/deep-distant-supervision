@@ -168,8 +168,8 @@ def test(test_data, model, loss_fn):
     for x, y in test_data:
         output = model(x)
         loss_sum += loss_fn(output.squeeze(), y.squeeze())
-        all_y.append(y.data.cpu().numpy())
-        all_predicted_y.append(output.data.cpu().numpy())
+        all_y.append(y.squeeze().data.cpu().numpy())
+        all_predicted_y.append(output.squeeze().data.cpu().numpy())
     logger.info("Loss sum : %f", loss_sum)
     evaluation(np.array(all_predicted_y), np.array(all_y))
     logger.info('Done ...')
@@ -198,7 +198,7 @@ if __name__ == '__main__':
     num_layers = 2
     seq_len = 70
     pos_dim = 5
-    num_epoch = 3
+    num_epoch = 1
     batch_size = 1
     num_voca = len(fetcher.word2id)
     num_relations = len(fetcher.rel2id)
@@ -247,4 +247,4 @@ if __name__ == '__main__':
 
     test_path = '../../data/nyt/test.txt'
     test_fetcher = NYTFetcher(w2v_path, rel_path, embed_dim, test_path)
-    test(test_fetcher, model, loss_fn)
+    test(DataLoader(NYTData(test_fetcher, device), batch_size=1), model, loss_fn)
